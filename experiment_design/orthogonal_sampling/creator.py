@@ -29,23 +29,36 @@ def _iman_connover(doe: np.ndarray, target_correlation: np.ndarray) -> np.ndarra
     return np.argsort(np.argsort(new, axis=0), axis=0) / new.shape[0]
 
 
-def _generate_lhd_probabilities(num_variables: int, sample_size: int, target_correlation: np.ndarray) -> np.ndarray:
+def generate_lhd_probabilities(num_variables: int, sample_size: int, target_correlation: np.ndarray) -> np.ndarray:
     probabilities = _create_probabilities(num_variables, sample_size)
     target_correlation = get_correlation_matrix(target_correlation=target_correlation,
                                                 num_variables=num_variables)
     return _iman_connover(probabilities, target_correlation)
 
 
-def generate_lhd_probabilities(num_variables: int, sample_size: int, scorer: Scorer,
-                               target_correlation: np.ndarray, steps: int) -> np.ndarray:
-    return get_best_try(
-        partial(_generate_lhd_probabilities, num_variables, sample_size, target_correlation),
-        scorer,
-        steps
-    )
+def create_fast_orthogonal_design(variables: list[Variable], sample_size: int,
+                                  steps: Optional[int] = None,
+                                  scorer: Optional[Scorer] = None) -> np.ndarray:
+    """
+    Create an orthogonal design without any correlation transformation. Useful for
+    creating very large designs (n >> 10_000). For smaller designs, please use
+    OrthogonalDesignCreator
+
+    :param variables: Determines the dimensions of the resulting sample
+    :param sample_size: the number of points to be created
+    :param scorer: Used to rank the generated DoEs. Specifically, steps
+    number of DoEs will be created and the one with the highest score
+    will be returned.
+    :param steps: Number of DoEs to be created to choose the best from
+    :return: DoE matrix with shape (len(variables), samples_size)
+    """
+    if steps is not None or scorer is not None:
+        raise ValueError("This function does not use any optimization. Please use OrthogonalDesignCreator")
+    doe = _create_probabilities(len(variables), sample_size)
+    return map_probabilities_to_values(doe)
 
 
-class LatinHypercubeDesignCreator:
+class OrthogonalDesignCreator:
 
     def __init__(self, target_correlation: Union[np.ndarray, float] = 0., central_design=False) -> None:
         self.target_correlation = target_correlation
@@ -66,15 +79,23 @@ class LatinHypercubeDesignCreator:
         :param steps: Number of DoEs to be created to choose the best from
         :return: DoE matrix with shape (len(variables), samples_size)
         """
-        # TODO: Assert uniform variables
+        target_correlation = get_correlation_matrix(self.target_correlation, num_variables=len(variables))
+        if steps < 2:
+            # Enable faster use cases:
+            doe = generate_lhd_probabilities(num_variables=len(variables),
+                                             sample_size=sample_size,
+                                             target_correlation=target_correlation)
+            return map_probabilities_to_values(doe, variables)
         init_steps = max(1, round(0.1 * steps))
         opt_steps = max(1, steps - init_steps)
         target_correlation = get_correlation_matrix(self.target_correlation, num_variables=len(variables))
         init_scorer = make_corr_error_scorer(target_correlation)
-        doe = generate_lhd_probabilities(len(variables), sample_size, init_scorer, target_correlation,
-                                         init_steps)
+        doe = get_best_try(
+            partial(generate_lhd_probabilities, len(variables), sample_size, target_correlation),
+            init_scorer,
+            init_steps
+        )
         if scorer is None:
             scorer = make_default_scorer(variables, target_correlation)
         doe = map_probabilities_to_values(doe, variables)
         return simulated_annealing(doe, scorer, opt_steps)
-
