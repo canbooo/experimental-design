@@ -51,7 +51,7 @@ class ContinuousVariable:
 @dataclass
 class DiscreteVariable:
     distribution: rv_discrete
-    value_mapper: Callable[[float], Union[float, int, str]] = lambda x: x
+    value_mapper: Callable[[float], Union[float, int]] = lambda x: x
 
     def __post_init__(self) -> None:
         if not is_frozen_discrete(self.distribution):
@@ -73,7 +73,13 @@ def create_discrete_variables(discrete_sets: list[list[Union[int, float, str]]]
         variables.append(
             DiscreteVariable(
                 distribution=randint(0, n_values),
-                value_mapper=lambda x: discrete_set[int(x)]
+                # Don't forget to bind the discrete_set below either by
+                # defining a kwarg as done here, or by generating in in another
+                # scope, e.g. function. Otherwise, the last value of discrete_set
+                # i.e. the last entry of discrete_sets will be used for all converters
+                # Check https://stackoverflow.com/questions/19837486/lambda-in-a-loop
+                # for a description as this is expected python behaviour.
+                value_mapper=lambda x, values=discrete_set: values[int(x)]
             )
         )
     return variables
