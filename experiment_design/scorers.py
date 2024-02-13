@@ -17,10 +17,8 @@ def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-8) ->
     and the target_correlation.
 
     :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
-    representing the linear dependency between the dimensions. If a float, all non-diagonal entries
-    of the unit matrix will be set to this value.
+    representing the linear dependency between the dimensions.
     :param eps: a small positive value to improve the stability of the log operation
-
     :return: a scorer that returns the log negative maximum absolute correlation error
     """
 
@@ -35,7 +33,6 @@ def make_min_pairwise_distance_scorer(max_distance: float = 1.) -> Scorer:
     """
     Create a scorer, that computes the minimum pairwise distance between the samples.
     :param max_distance: Used for scaling the log
-
     :return: a scorer that returns the log minimum pairwise distance divided by the log max distance
     """
     max_log_distance = np.log(max_distance)
@@ -49,6 +46,19 @@ def make_min_pairwise_distance_scorer(max_distance: float = 1.) -> Scorer:
 
 def make_default_scorer(variables: list[Variable],
                         target_correlation: Union[np.ndarray, float] = 0.):
+    """
+    Create a default scorer, which creates a scorer from the sum of minimum
+    pairwise distance and maximum correlation error scorers. See those scorers
+
+    for more details.
+
+    :param variables: variables of the doe. Used to determine the dimension number and
+    bounds of the space
+    :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
+    representing the linear dependency between the dimensions. If a float, all non-diagonal entries
+    of the unit matrix will be set to this value.
+    :return: scorer as a sum of the minimum pairwise distance and maximum correlation error scorers.
+    """
     mins = np.array([var.value_of(0.001) for var in variables])
     maxs = np.array([var.value_of(0.999) for var in variables])
     dmax = np.linalg.norm(maxs - mins)
