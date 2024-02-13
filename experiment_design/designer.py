@@ -10,7 +10,7 @@ from experiment_design.variable import Variable
 class DesignCreator(Protocol):
     def __call__(self, variables: list[Variable], sample_size: int,
                  steps: Optional[int] = None,
-                 scorer: Optional[Callable[[np.ndarray], float]] = None,
+                 scorer: Optional[Scorer] = None,
                  ) -> np.ndarray:
         """
         Create a design of experiments (DoE)
@@ -28,8 +28,7 @@ class DesignCreator(Protocol):
 
 class DesignExtender:
     def __call__(self, old_sample: np.ndarray, variables: list[Variable], sample_size: int,
-                 steps: Optional[int] = None,
-                 scorer: Optional[Scorer] = None) -> np.ndarray:
+                 steps: Optional[int] = None, scorer: Optional[Scorer] = None) -> np.ndarray:
         """
         Extend a design of experiment (DoE)
 
