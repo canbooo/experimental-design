@@ -98,3 +98,17 @@ def create_uniform_variables(continuous_lower_bounds: list[float],
                                )
         )
     return variables
+
+
+def map_probabilities_to_values(probabilities: np.ndarray, variables: list[Variable]) -> np.ndarray:
+    """
+    Given an array of probabilities, return the corresponding values of the variables
+
+    :param probabilities: matrix of probabilities with shape (sample_size, len(variables))
+    :param variables: Variables to compute the corresponding values using the value_of method
+    :return: matrix of values with the same shape as the probabilities
+    """
+    samples = np.zeros(probabilities.shape)
+    for i_dim, variable in enumerate(variables):
+        samples[:, i_dim] = variable.value_of(samples[:, i_dim])
+    return samples
