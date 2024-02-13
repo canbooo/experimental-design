@@ -1,13 +1,27 @@
 from dataclasses import dataclass
-from typing import Optional, Union, Callable, Protocol
+from typing import Optional, Union, Callable, Protocol, Any
 
 import numpy as np
-from scipy.stats import rv_continuous, uniform, rv_discrete, randint
+from scipy.stats import randint, rv_continuous, rv_discrete, uniform
+
 
 class Variable(Protocol):
 
     def value_of(self, probability: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         ...
+
+
+def is_frozen_discrete(dist: Any) -> bool:
+    if not hasattr(dist, 'dist'):
+        return False
+    return isinstance(dist.dist, rv_discrete)
+
+
+def is_frozen_continuous(dist: Any) -> bool:
+    if not hasattr(dist, 'dist'):
+        return False
+    return isinstance(dist.dist, rv_continuous)
+
 
 @dataclass
 class ContinuousVariable:
@@ -22,11 +36,16 @@ class ContinuousVariable:
         if self.distribution is None:
             self.distribution = uniform(self.lower_bound,
                                         self.upper_bound - self.lower_bound)
-        if not isinstance(self.distribution, rv_continuous):
-            raise ValueError("Only continuous distributions are supported.")
+        if None not in [self.lower_bound, self.upper_bound] and self.lower_bound >= self.upper_bound:
+            raise ValueError("lower_bound has to be smaller than upper_bound")
+        if not is_frozen_continuous(self.distribution):
+            raise ValueError("Only frozen continuous distributions are supported.")
 
     def value_of(self, probability: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        return self.distribution.ppf(probability)
+        values = self.distribution.ppf(probability)
+        if self.upper_bound is not None or self.lower_bound is not None:
+            return np.clip(values, self.lower_bound, self.upper_bound)
+        return values
 
 
 @dataclass
@@ -35,8 +54,8 @@ class DiscreteVariable:
     value_mapper: Callable[[Union[float, int]], Union[float, int, str]] = lambda x: x
 
     def __post_init__(self) -> None:
-        if not isinstance(self.distribution, rv_discrete):
-            raise ValueError("Only discrete distributions are supported.")
+        if is_frozen_discrete(self.distribution):
+            raise ValueError("Only frozen discrete distributions are supported.")
 
     def value_of(self, probability: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         values = self.distribution.ppf(probability)
@@ -47,8 +66,9 @@ class DiscreteVariable:
         values = np.apply_along_axis(self.value_mapper, values.ravel(), axis=0)
         return values.reshape(shape)
 
+
 def create_discrete_variables(discrete_sets: list[list[Union[int, float, str]]]
-                              ) -> list[DiscreteVariable]
+                              ) -> list[DiscreteVariable]:
     variables = []
     for discrete_set in discrete_sets:
         n_values = len(discrete_set)
@@ -62,6 +82,7 @@ def create_discrete_variables(discrete_sets: list[list[Union[int, float, str]]]
         )
     return variables
 
+
 def create_uniform_variables(continuous_lower_bounds: list[float],
                              continuous_upper_bounds: list[float]
                              ) -> list[Union[DiscreteVariable, ContinuousVariable]]:
@@ -72,6 +93,6 @@ def create_uniform_variables(continuous_lower_bounds: list[float],
         variables.append(
             ContinuousVariable(lower_bound=lower,
                                upper_bound=upper
-            )
+                               )
         )
     return variables
