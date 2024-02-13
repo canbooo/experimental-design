@@ -51,20 +51,16 @@ class ContinuousVariable:
 @dataclass
 class DiscreteVariable:
     distribution: rv_discrete
-    value_mapper: Callable[[Union[float, int]], Union[float, int, str]] = lambda x: x
+    value_mapper: Callable[[float], Union[float, int, str]] = lambda x: x
 
     def __post_init__(self) -> None:
-        if is_frozen_discrete(self.distribution):
+        if not is_frozen_discrete(self.distribution):
             raise ValueError("Only frozen discrete distributions are supported.")
+        self.value_mapper = np.frompyfunc(self.value_mapper, nin=1, nout=1)
 
     def value_of(self, probability: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         values = self.distribution.ppf(probability)
-        if not isinstance(values, np.ndarray):
-            return self.value_mapper(values)
-
-        shape = values.shape
-        values = np.apply_along_axis(self.value_mapper, values.ravel(), axis=0)
-        return values.reshape(shape)
+        return self.value_mapper(values)
 
 
 def create_discrete_variables(discrete_sets: list[list[Union[int, float, str]]]
@@ -77,7 +73,7 @@ def create_discrete_variables(discrete_sets: list[list[Union[int, float, str]]]
         variables.append(
             DiscreteVariable(
                 distribution=randint(0, n_values),
-                value_mapper=lambda x: discrete_set[x]
+                value_mapper=lambda x: discrete_set[int(x)]
             )
         )
     return variables

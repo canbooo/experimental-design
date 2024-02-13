@@ -40,3 +40,23 @@ class TestContinuousVariable:
         assert var.value_of(0) == -5
         assert var.value_of(0.5) == 0
 
+
+class TestDiscreteVariable:
+
+    def test_fail_distribution(self):
+        with pytest.raises(ValueError):
+            module_under_test.DiscreteVariable(distribution=stats.uniform(0, 1))
+
+    def test_value_of(self):
+        var = module_under_test.DiscreteVariable(distribution=stats.bernoulli(0.5))
+        assert var.value_of(1e-6) == 0 # 0 return -1 for both bernoulli and randint
+        assert var.value_of(1) == 1
+        assert var.distribution.dist.name == "bernoulli"
+
+    def test_value_of_with_mapper(self):
+        values = ["Off", "On"]
+        var = module_under_test.DiscreteVariable(distribution=stats.bernoulli(0.5),
+                                                 value_mapper=lambda x: values[int(x)])
+        assert var.value_of(1e-6) == "Off"
+        assert var.value_of(1) == "On"
+        assert np.all(var.value_of(np.array([1e-6, 1])) == np.array(values))
