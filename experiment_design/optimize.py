@@ -7,7 +7,9 @@ from scipy.special import comb as combine
 from experiment_design.scorers import Scorer
 
 
-def get_best_try(creator: Callable[[], np.ndarray], scorer: Scorer, steps: int) -> np.ndarray:
+def get_best_try(
+    creator: Callable[[], np.ndarray], scorer: Scorer, steps: int
+) -> np.ndarray:
     steps = max(1, steps)
     best_score, best_doe = -np.inf, None
     for _ in range(steps):
@@ -19,7 +21,9 @@ def get_best_try(creator: Callable[[], np.ndarray], scorer: Scorer, steps: int) 
     return best_doe
 
 
-def get_available_column(num_variables: int, sample_size: int, switched_pairs: np.ndarray) -> int:
+def get_available_column(
+    num_variables: int, sample_size: int, switched_pairs: np.ndarray
+) -> int:
     max_combinations = combine(sample_size, 2)
     uniques, col_counts = np.unique(switched_pairs[:, 0], return_counts=True)
     uniques = set(uniques[col_counts >= max_combinations])
@@ -29,8 +33,11 @@ def get_available_column(num_variables: int, sample_size: int, switched_pairs: n
     return np.random.choice(list(range(num_variables)))
 
 
-def get_available_row(sample_size: int, switched_pairs_in_columns: np.ndarray,
-                       blocked_rows: Optional[list[int]] = None) -> int:
+def get_available_row(
+    sample_size: int,
+    switched_pairs_in_columns: np.ndarray,
+    blocked_rows: Optional[list[int]] = None,
+) -> int:
     blocked_rows = set(blocked_rows) if blocked_rows else {}
     possible_rows = [row for row in range(sample_size) if row not in blocked_rows]
     max_switches = sample_size - 1
@@ -42,8 +49,11 @@ def get_available_row(sample_size: int, switched_pairs_in_columns: np.ndarray,
     return np.random.choice(possible_rows)
 
 
-def perturb_rows_along_column(matrix: np.ndarray, switched_pairs: list[tuple[int, int, int]],
-                              column: Optional[int] = None) -> np.ndarray:
+def perturb_rows_along_column(
+    matrix: np.ndarray,
+    switched_pairs: list[tuple[int, int, int]],
+    column: Optional[int] = None,
+) -> np.ndarray:
     """
     Randomly switches rows of a matrix along one column
 
@@ -61,10 +71,17 @@ def perturb_rows_along_column(matrix: np.ndarray, switched_pairs: list[tuple[int
 
     column = get_available_column(columns, rows, pairs) if column is None else column
     pairs = pairs[pairs[:, 0] == column, 1:]
-    row_1 = get_available_row(sample_size=rows, switched_pairs_in_columns=pairs, blocked_rows=None)
-    row_2 = get_available_row(sample_size=rows, switched_pairs_in_columns=pairs, blocked_rows=[row_1])
+    row_1 = get_available_row(
+        sample_size=rows, switched_pairs_in_columns=pairs, blocked_rows=None
+    )
+    row_2 = get_available_row(
+        sample_size=rows, switched_pairs_in_columns=pairs, blocked_rows=[row_1]
+    )
 
-    matrix[row_1, column], matrix[row_2, column] = matrix[row_2, column], matrix[row_1, column]
+    matrix[row_1, column], matrix[row_2, column] = (
+        matrix[row_2, column],
+        matrix[row_1, column],
+    )
     switched_pairs.append((column, row_1, row_2))
     return matrix
 
@@ -85,13 +102,19 @@ should be Part of scoring but was in optimize
 """
 
 
-def simulated_annealing_by_perturbation(doe: np.ndarray, scorer: Scorer, steps: int = 1000, decay: float = .95,
-                                        simulation_time: float = 25., max_steps_without_improvement: int = 25,
-                                        verbose: int = 0) -> np.ndarray:
+def simulated_annealing_by_perturbation(
+    doe: np.ndarray,
+    scorer: Scorer,
+    steps: int = 1000,
+    decay: float = 0.95,
+    simulation_time: float = 25.0,
+    max_steps_without_improvement: int = 25,
+    verbose: int = 0,
+) -> np.ndarray:
     if simulation_time <= 1e-16:
         raise ValueError("simulation_time must be strictly positive.")
     if not 0 <= decay <= 1:
-        raise ValueError('decay has to be between 0 and 1.')
+        raise ValueError("decay has to be between 0 and 1.")
     if max_steps_without_improvement < 1:
         max_steps_without_improvement = 1
 

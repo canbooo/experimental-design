@@ -24,10 +24,12 @@ def _create(variables: VariableCollection, sample_size: int) -> np.ndarray:
     return variables.value_of(doe)
 
 
-def create(variables: VariableCollection, sample_size: int,
-           steps: Optional[int] = None,
-           scorer: Optional[Scorer] = None
-           ) -> np.ndarray:
+def create(
+    variables: VariableCollection,
+    sample_size: int,
+    steps: Optional[int] = None,
+    scorer: Optional[Scorer] = None,
+) -> np.ndarray:
     """
     Create a design of experiments (DoE) by randomly sampling from the
     variable distributions.
@@ -47,14 +49,17 @@ def create(variables: VariableCollection, sample_size: int,
         return _create(variables, sample_size)
 
     if scorer is None:
-        scorer = make_default_scorer(variables, target_correlation=0.)
-    return get_best_try(partial(_create, variables, sample_size),
-                        scorer, steps)
+        scorer = make_default_scorer(variables, target_correlation=0.0)
+    return get_best_try(partial(_create, variables, sample_size), scorer, steps)
 
 
-def extend(old_sample: np.ndarray, variables: list[Variable],
-           sample_size: int, steps: Optional[int] = None,
-           scorer: Optional[Scorer] = None):
+def extend(
+    old_sample: np.ndarray,
+    variables: list[Variable],
+    sample_size: int,
+    steps: Optional[int] = None,
+    scorer: Optional[Scorer] = None,
+):
     """
     Extend a design of experiment (DoE) by randomly sampling from the
     variable distributions.
@@ -72,7 +77,7 @@ def extend(old_sample: np.ndarray, variables: list[Variable],
         return _create(variables, sample_size)
 
     if scorer is None:
-        scorer = make_default_scorer(variables, target_correlation=0.)
+        scorer = make_default_scorer(variables, target_correlation=0.0)
 
     def append_and_score(new_doe: np.ndarray) -> float:
         doe = np.append(old_sample, new_doe)

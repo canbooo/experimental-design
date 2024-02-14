@@ -8,10 +8,13 @@ from experiment_design.types import VariableCollection
 
 
 class DesignCreator(Protocol):
-    def __call__(self, variables: VariableCollection, sample_size: int,
-                 steps: Optional[int] = None,
-                 scorer: Optional[Scorer] = None,
-                 ) -> np.ndarray:
+    def __call__(
+        self,
+        variables: VariableCollection,
+        sample_size: int,
+        steps: Optional[int] = None,
+        scorer: Optional[Scorer] = None,
+    ) -> np.ndarray:
         """
         Create a design of experiments (DoE)
 
@@ -27,8 +30,14 @@ class DesignCreator(Protocol):
 
 
 class DesignExtender:
-    def __call__(self, old_sample: np.ndarray, variables: VariableCollection, sample_size: int,
-                 steps: Optional[int] = None, scorer: Optional[Scorer] = None) -> np.ndarray:
+    def __call__(
+        self,
+        old_sample: np.ndarray,
+        variables: VariableCollection,
+        sample_size: int,
+        steps: Optional[int] = None,
+        scorer: Optional[Scorer] = None,
+    ) -> np.ndarray:
         """
         Extend a design of experiment (DoE)
 
@@ -42,5 +51,3 @@ class DesignExtender:
         :return: Matrix of new points to be added with shape (len(variables), samples_size)
         """
         ...
-
-

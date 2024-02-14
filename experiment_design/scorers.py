@@ -23,7 +23,7 @@ def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-8) ->
     :return: a scorer that returns the log negative maximum absolute correlation error
     """
     if np.max(np.abs(target_correlation)) > 1:
-        raise ValueError('Correlations should be in the interval [-1,1].')
+        raise ValueError("Correlations should be in the interval [-1,1].")
 
     def _scorer(doe: np.ndarray) -> float:
         error = np.max(np.abs(np.corrcoef(doe, rowvar=False) - target_correlation))
@@ -32,7 +32,7 @@ def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-8) ->
     return _scorer
 
 
-def make_min_pairwise_distance_scorer(max_distance: float = 1.) -> Scorer:
+def make_min_pairwise_distance_scorer(max_distance: float = 1.0) -> Scorer:
     """
     Create a scorer, that computes the minimum pairwise distance between the samples.
     :param max_distance: Used for scaling the log
@@ -47,9 +47,11 @@ def make_min_pairwise_distance_scorer(max_distance: float = 1.) -> Scorer:
     return _scorer
 
 
-def make_default_scorer(variables: VariableCollection,
-                        target_correlation: Union[np.ndarray, float] = 0.,
-                        correlation_score_weight: float = 0.2):
+def make_default_scorer(
+    variables: VariableCollection,
+    target_correlation: Union[np.ndarray, float] = 0.0,
+    correlation_score_weight: float = 0.2,
+):
     """
     Create a default scorer, which creates a scorer from the sum of minimum
     pairwise distance and maximum correlation error scorers. See those scorers
@@ -68,8 +70,9 @@ def make_default_scorer(variables: VariableCollection,
         variables = DesignSpace(variables)
     max_distance = get_max_distance(variables)
     dist_scorer = make_min_pairwise_distance_scorer(max_distance)
-    target_correlation = get_correlation_matrix(target_correlation=target_correlation,
-                                                num_variables=variables.dimensions)
+    target_correlation = get_correlation_matrix(
+        target_correlation=target_correlation, num_variables=variables.dimensions
+    )
     corr_scorer = make_corr_error_scorer(target_correlation)
     return lambda doe: dist_scorer(doe) + correlation_score_weight * corr_scorer(doe)
 
@@ -79,11 +82,17 @@ def get_max_distance(space: DesignSpace) -> float:
     return np.linalg.norm(np.array(upper) - np.array(lower))
 
 
-def get_correlation_matrix(target_correlation: Union[np.ndarray, float] = 0., num_variables: Optional[int] = None
-                           ) -> np.ndarray:
+def get_correlation_matrix(
+    target_correlation: Union[np.ndarray, float] = 0.0,
+    num_variables: Optional[int] = None,
+) -> np.ndarray:
     if not np.isscalar(target_correlation):
         return target_correlation
     if not num_variables:
-        raise ValueError("num_variables have to be passed if the target_correlation is a scalar.")
-    return np.eye(num_variables) * (1 - target_correlation) + np.ones(
-        (num_variables, num_variables)) * target_correlation
+        raise ValueError(
+            "num_variables have to be passed if the target_correlation is a scalar."
+        )
+    return (
+        np.eye(num_variables) * (1 - target_correlation)
+        + np.ones((num_variables, num_variables)) * target_correlation
+    )
