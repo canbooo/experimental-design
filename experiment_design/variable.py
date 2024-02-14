@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Protocol, Union
 
 import numpy as np
@@ -120,13 +120,10 @@ class DiscreteVariable:
 @dataclass
 class DesignSpace:
     variables: list[Variable]
-    _lower_bound: Optional[np.ndarray] = None
-    _upper_bound: Optional[np.ndarray] = None
+    _lower_bound: np.ndarray = field(init=False, repr=False, default=None)
+    _upper_bound: np.ndarray = field(init=False, repr=False, default=None)
 
     def __post_init__(self):
-        self._read_finite_bounds()
-
-    def _read_finite_bounds(self) -> None:
         lower, upper = [], []
         for var in self.variables:
             lower.append(var.get_finite_lower_bound())
@@ -146,23 +143,9 @@ class DesignSpace:
     def lower_bound(self) -> np.ndarray:
         return self._lower_bound
 
-    @lower_bound.setter
-    def lower_bound(self, new_bound: np.ndarray) -> None:
-        for var, lb in zip(self.variables, new_bound.ravel()):
-            if isinstance(var, ContinuousVariable):
-                var.lower_bound = lb
-        self._read_finite_bounds()
-
     @property
     def upper_bound(self) -> np.ndarray:
         return self._upper_bound
-
-    @upper_bound.setter
-    def upper_bound(self, new_bound: np.ndarray) -> None:
-        for var, ub in zip(self.variables, new_bound.ravel()):
-            if isinstance(var, DiscreteVariable):
-                var.upper_bound = ub
-        self._read_finite_bounds()
 
     @property
     def dimensions(self) -> int:
