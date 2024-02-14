@@ -64,7 +64,7 @@ class TestDiscreteVariable:
 
 
 def test_create_discrete_variables():
-    variables = module_under_test.create_discrete_variables(
+    variables = module_under_test.create_discrete_uniform_variables(
         [
             [1, 2],
             [3, 4, 5],
@@ -84,7 +84,7 @@ def test_create_discrete_variables():
 
 
 def test_create_uniform_variables():
-    variables = module_under_test.create_uniform_variables(
+    variables = module_under_test.create_continuous_uniform_variables(
         [1, 42, 665],
         [3, 52, 667]
     )
