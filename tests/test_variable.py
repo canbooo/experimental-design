@@ -12,9 +12,30 @@ def discrete_bernoulli() -> module_under_test.DiscreteVariable:
         distribution=stats.bernoulli(0.5), value_mapper=lambda x: values[int(x)]
     )
 
+
 @pytest.fixture
 def standard_normal() -> module_under_test.ContinuousVariable:
     return module_under_test.ContinuousVariable(distribution=stats.norm(0, 1))
+
+@pytest.fixture
+def continuous_space() -> module_under_test.DesignSpace:
+    variables = [module_under_test.ContinuousVariable(distribution=stats.uniform(-1, 1)) for _ in range(2)]
+    return module_under_test.DesignSpace(variables)
+
+@pytest.fixture
+def mixed_space() -> module_under_test.DesignSpace:
+    variables = [module_under_test.ContinuousVariable(distribution=stats.uniform(-1, 1)),
+                 module_under_test.DiscreteVariable(distribution=stats.bernoulli(0.2))]
+    return module_under_test.DesignSpace(variables)
+
+@pytest.fixture(params=(
+    [stats.uniform(-2, 2) for _ in range(2)],
+    [stats.uniform(-2, 2), stats.bernoulli(0.2)],
+    [stats.bernoulli(0.2) for _ in range(2)],
+), ids=("Continuous", "Mixed", "Discrete"))
+def design_space(request) -> module_under_test.DesignSpace:
+    variables = module_under_test.create_variables_from_distributions(request.params)
+    return module_under_test.DesignSpace(variables)
 
 
 class TestContinuousVariable:
