@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Union, Callable, Protocol, Any
+from typing import Any, Callable, Optional, Protocol, Union
 
 import numpy as np
 from scipy.stats import randint, rv_continuous, rv_discrete, uniform
@@ -12,18 +12,15 @@ from scipy.stats._distn_infrastructure import rv_frozen
 class Variable(Protocol):
     def value_of(
         self, probability: Union[float, np.ndarray]
-    ) -> Union[float, np.ndarray]:
-        ...
+    ) -> Union[float, np.ndarray]: ...
 
     def get_finite_lower_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
-        ...
+    ) -> float: ...
 
     def get_finite_upper_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 def is_frozen_discrete(dist: Any) -> bool:
@@ -107,25 +104,17 @@ class DiscreteVariable:
         self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         support = self.distribution.support()
-        if not np.all(np.isfinite(support)):
-            return self.value_of(infinite_support_probability_tolerance)
-        # Following test is required because scipy sometimes returns incorrect values for probabilities 0 and 1
-        test = self.distribution.ppf(0.0)
-        if test in range(*support):
-            return self.value_of(0.0)
+        if np.isfinite(support[0]):
+            return self.value_mapper(support[0])
         return self.value_of(infinite_support_probability_tolerance)
 
     def get_finite_upper_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         support = self.distribution.support()
-        if not np.all(np.isfinite(support)):
-            return self.value_of(1 - infinite_support_probability_tolerance)
-        # Following test is required because scipy sometimes returns incorrect values for probabilities 0 and 1
-        test = self.distribution.ppf(1.0)
-        if test in range(*support):
-            return self.value_of(1.0)
-        return self.value_of(infinite_support_probability_tolerance)
+        if np.isfinite(support[1]):
+            return self.value_mapper(support[1])
+        return self.value_of(1 - infinite_support_probability_tolerance)
 
 
 @dataclass
