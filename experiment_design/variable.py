@@ -4,6 +4,10 @@ from typing import Optional, Union, Callable, Protocol, Any
 import numpy as np
 from scipy.stats import randint, rv_continuous, rv_discrete, uniform
 
+# Following is ugly, but it is scipy's fault for not exposing rv_frozen
+# noinspection PyProtectedMember
+from scipy.stats._distn_infrastructure import rv_frozen
+
 
 class Variable(Protocol):
     def value_of(
@@ -23,20 +27,16 @@ class Variable(Protocol):
 
 
 def is_frozen_discrete(dist: Any) -> bool:
-    if not hasattr(dist, "dist"):
-        return False
-    return isinstance(dist.dist, rv_discrete)
+    return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_discrete)
 
 
 def is_frozen_continuous(dist: Any) -> bool:
-    if not hasattr(dist, "dist"):
-        return False
-    return isinstance(dist.dist, rv_continuous)
+    return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_continuous)
 
 
 @dataclass
 class ContinuousVariable:
-    distribution: Optional[rv_continuous] = None
+    distribution: Optional[rv_frozen] = None
     lower_bound: Optional[float] = None
     upper_bound: Optional[float] = None
 
@@ -89,7 +89,7 @@ class ContinuousVariable:
 
 @dataclass
 class DiscreteVariable:
-    distribution: rv_discrete
+    distribution: rv_frozen
     value_mapper: Callable[[float], Union[float, int]] = lambda x: x
 
     def __post_init__(self) -> None:
@@ -191,6 +191,9 @@ def create_discrete_uniform_variables(
         n_values = len(discrete_set)
         if n_values < 2:
             raise ValueError("At least two values are required for discrete variables")
+        # In the following, it is OK and even advantageous to have a mutable
+        # default argument as a very rare occasion. Therefore, we disable inspection.
+        # noinspection PyDefaultArgument
         variables.append(
             DiscreteVariable(
                 distribution=randint(0, n_values),
