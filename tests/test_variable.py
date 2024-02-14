@@ -197,3 +197,37 @@ class TestDesignSpace:
             # Both are continuous
             expected = np.array([[-1.6, -1.6], [0, 0.4], [1.6, 1.2]])
         assert np.all(np.isclose(design_space.value_of(probabilities), expected))
+
+    def test_design_space_size_getters(
+        self, design_space: module_under_test.DesignSpace
+    ):
+        assert design_space.dimensions == 2
+        assert len(design_space) == 2
+
+    def test_design_space_lower_bound(
+        self, design_space: module_under_test.DesignSpace
+    ):
+        if isinstance(design_space.variables[0], module_under_test.DiscreteVariable):
+            # Both are discrete
+            expected = np.array([0, 0])
+        elif isinstance(design_space.variables[1], module_under_test.DiscreteVariable):
+            # Mixed case
+            expected = np.array([-2, 0])
+        else:
+            # Both are continuous
+            expected = np.array([-2, -2])
+        assert all(design_space.lower_bound == expected)
+
+    def test_design_space_upper_bound(
+        self, design_space: module_under_test.DesignSpace
+    ):
+        if isinstance(design_space.variables[0], module_under_test.DiscreteVariable):
+            # Both are discrete
+            expected = np.array([1, 1])
+        elif isinstance(design_space.variables[1], module_under_test.DiscreteVariable):
+            # Mixed case
+            expected = np.array([2, 1])
+        else:
+            # Both are continuous
+            expected = np.array([2, 2])
+        assert all(design_space.upper_bound == expected)
