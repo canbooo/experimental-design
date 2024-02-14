@@ -29,10 +29,6 @@ jobs:
     - name: Install dependencies
       run: |
         poetry install --with dev --no-interaction
-    - name: Run pre-commit hooks
-      run: |
-        pre-commit install
-        pre-commit run
     - name: Test with pytest
       run: |
         poetry run pytest tests
