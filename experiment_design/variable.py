@@ -220,3 +220,19 @@ def create_continuous_uniform_variables(
     for lower, upper in zip(continuous_lower_bounds, continuous_upper_bounds):
         variables.append(ContinuousVariable(lower_bound=lower, upper_bound=upper))
     return variables
+
+
+def create_variables_from_distributions(
+    distributions: list[rv_frozen],
+) -> list[Variable]:
+    variables = []
+    for dist in distributions:
+        if is_frozen_discrete(dist):
+            variables.append(DiscreteVariable(distribution=dist))
+        elif is_frozen_continuous(dist):
+            variables.append(ContinuousVariable(distribution=dist))
+        else:
+            raise ValueError(
+                f"Each distribution must be a frozen discrete or continuous type, got {type(dist)}"
+            )
+    return variables
