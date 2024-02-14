@@ -12,6 +12,9 @@ def discrete_bernoulli() -> module_under_test.DiscreteVariable:
         distribution=stats.bernoulli(0.5), value_mapper=lambda x: values[int(x)]
     )
 
+@pytest.fixture
+def standard_normal() -> module_under_test.ContinuousVariable:
+    return module_under_test.ContinuousVariable(distribution=stats.norm(0, 1))
 
 
 class TestContinuousVariable:
@@ -37,25 +40,20 @@ class TestContinuousVariable:
         assert var.value_of(1) == 1
         assert var.distribution.dist.name == "uniform"
 
-    def test_value_of_from_dist(self):
-        var = module_under_test.ContinuousVariable(distribution=stats.norm(0, 1))
-        assert not np.isfinite(var.value_of(np.arange(2))).any()
-        assert var.value_of(0.5) == 0
-        assert var.distribution.dist.name == "norm"
+    def test_value_of_from_dist(self, standard_normal):
+        assert not np.isfinite(standard_normal.value_of(np.arange(2))).any()
+        assert standard_normal.value_of(0.5) == 0
+        assert standard_normal.distribution.dist.name == "norm"
 
-    def test_value_of_from_dist_and_bound(self):
-        var = module_under_test.ContinuousVariable(
-            distribution=stats.norm(0, 1), lower_bound=-5
-        )
-        assert not np.isfinite(var.value_of(1.0))
-        assert var.value_of(0) == -5
-        assert var.value_of(0.5) == 0
+    def test_value_of_from_dist_and_bound(self, standard_normal):
+        standard_normal.lower_bound = -5
+        assert not np.isfinite(standard_normal.value_of(1.0))
+        assert standard_normal.value_of(0) == -5
+        assert standard_normal.value_of(0.5) == 0
 
-    def test_finite_lower_bound_given(self):
-        var = module_under_test.ContinuousVariable(
-            distribution=stats.norm(0, 1), lower_bound=-5
-        )
-        assert var.get_finite_lower_bound() == -5
+    def test_finite_lower_bound_given(self, standard_normal):
+        standard_normal.lower_bound = -5
+        assert standard_normal.get_finite_lower_bound() == -5
 
     def test_finite_lower_bound_finite(self):
         var = module_under_test.ContinuousVariable(
@@ -63,20 +61,14 @@ class TestContinuousVariable:
         )
         assert var.get_finite_lower_bound() == 0
 
-    def test_finite_lower_bound_infinite(self):
-        dist = stats.norm(0, 1)
+    def test_finite_lower_bound_infinite(self, standard_normal):
         tol = 2.5e-2
-        var = module_under_test.ContinuousVariable(
-            distribution=dist
-        )
-        assert np.isclose(var.get_finite_lower_bound(infinite_support_probability_tolerance=tol),
+        assert np.isclose(standard_normal.get_finite_lower_bound(infinite_support_probability_tolerance=tol),
                           -1.95996)
 
-    def test_finite_upper_bound_given(self):
-        var = module_under_test.ContinuousVariable(
-            distribution=stats.norm(0, 1), upper_bound=5
-        )
-        assert var.get_finite_upper_bound() == 5
+    def test_finite_upper_bound_given(self, standard_normal):
+        standard_normal.upper_bound = 5
+        assert standard_normal.get_finite_upper_bound() == 5
 
     def test_finite_upper_bound_finite(self):
         var = module_under_test.ContinuousVariable(
@@ -84,13 +76,9 @@ class TestContinuousVariable:
         )
         assert var.get_finite_upper_bound() == 1
 
-    def test_finite_upper_bound_infinite(self):
-        dist = stats.norm(0, 1)
+    def test_finite_upper_bound_infinite(self, standard_normal):
         tol = 2.5e-2
-        var = module_under_test.ContinuousVariable(
-            distribution=dist
-        )
-        assert np.isclose(var.get_finite_upper_bound(infinite_support_probability_tolerance=tol),
+        assert np.isclose(standard_normal.get_finite_upper_bound(infinite_support_probability_tolerance=tol),
                           1.95996)
 
 
