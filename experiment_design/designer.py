@@ -1,14 +1,14 @@
-from typing import Protocol, Optional, Callable
+from typing import Protocol, Optional
 
 import numpy as np
 
 
 from experiment_design.scorers import Scorer
-from experiment_design.variable import Variable
+from experiment_design.types import VariableCollection
 
 
 class DesignCreator(Protocol):
-    def __call__(self, variables: list[Variable], sample_size: int,
+    def __call__(self, variables: VariableCollection, sample_size: int,
                  steps: Optional[int] = None,
                  scorer: Optional[Scorer] = None,
                  ) -> np.ndarray:
@@ -27,7 +27,7 @@ class DesignCreator(Protocol):
 
 
 class DesignExtender:
-    def __call__(self, old_sample: np.ndarray, variables: list[Variable], sample_size: int,
+    def __call__(self, old_sample: np.ndarray, variables: VariableCollection, sample_size: int,
                  steps: Optional[int] = None, scorer: Optional[Scorer] = None) -> np.ndarray:
         """
         Extend a design of experiment (DoE)

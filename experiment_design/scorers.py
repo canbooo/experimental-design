@@ -3,7 +3,8 @@ from typing import Protocol, Union, Optional
 import numpy as np
 from scipy.spatial.distance import pdist
 
-from experiment_design.variable import Variable
+from experiment_design.types import VariableCollection
+from experiment_design.variable import DesignSpace
 
 
 class Scorer(Protocol):
@@ -46,41 +47,35 @@ def make_min_pairwise_distance_scorer(max_distance: float = 1.) -> Scorer:
     return _scorer
 
 
-def make_default_scorer(variables: list[Variable],
-                        target_correlation: Union[np.ndarray, float] = 0.):
+def make_default_scorer(variables: VariableCollection,
+                        target_correlation: Union[np.ndarray, float] = 0.,
+                        correlation_score_weight: float = 0.2):
     """
     Create a default scorer, which creates a scorer from the sum of minimum
     pairwise distance and maximum correlation error scorers. See those scorers
     for more details.
+
 
     :param variables: variables of the doe. Used to determine the dimension number and
     bounds of the space
     :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
     representing the linear dependency between the dimensions. If a float, all non-diagonal entries
     of the unit matrix will be set to this value.
+    :param correlation_score_weight: Weight factor used for the max correlation error score.
     :return: scorer as a sum of the minimum pairwise distance and maximum correlation error scorers.
     """
-    dmax = get_max_distance(variables)
-    dist_scorer = make_min_pairwise_distance_scorer(dmax)
+    if not isinstance(variables, DesignSpace):
+        variables = DesignSpace(variables)
+    max_distance = get_max_distance(variables)
+    dist_scorer = make_min_pairwise_distance_scorer(max_distance)
     target_correlation = get_correlation_matrix(target_correlation=target_correlation,
-                                                num_variables=len(variables))
+                                                num_variables=variables.dimensions)
     corr_scorer = make_corr_error_scorer(target_correlation)
-    return lambda doe: dist_scorer(doe) + corr_scorer(doe)
+    return lambda doe: dist_scorer(doe) + correlation_score_weight * corr_scorer(doe)
 
 
-def get_max_distance(variables: list[Variable]) -> float:
-    lower, upper = [], []
-    for var in variables:
-        if hasattr(var, "lower_bound") and var.lower_bound:
-            lower.append(var.lower_bound)
-        else:
-            lower.append(var.value_of(0.001))
-
-        if hasattr(var, "upper_bound") and var.upper_bound:
-            upper.append(var.upper_bound)
-        else:
-            upper.append(var.value_of(0.999))
-
+def get_max_distance(space: DesignSpace) -> float:
+    lower, upper = space.lower_bound, space.upper_bound
     return np.linalg.norm(np.array(upper) - np.array(lower))
 
 

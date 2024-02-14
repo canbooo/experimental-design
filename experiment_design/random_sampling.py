@@ -6,10 +6,11 @@ from scipy.stats import uniform
 
 from experiment_design.optimize import get_best_try
 from experiment_design.scorers import Scorer, make_default_scorer
-from experiment_design.variable import Variable, map_probabilities_to_values
+from experiment_design.types import VariableCollection
+from experiment_design.variable import Variable, DesignSpace
 
 
-def _create(variables: list[Variable], sample_size: int) -> np.ndarray:
+def _create(variables: VariableCollection, sample_size: int) -> np.ndarray:
     """
     Create a design of experiments (DoE) by randomly sampling from passed variables
 
@@ -18,10 +19,12 @@ def _create(variables: list[Variable], sample_size: int) -> np.ndarray:
     :return: DoE matrix with shape (len(variables), samples_size)
     """
     doe = uniform(0, 1).rvs((sample_size, len(variables)))
-    return map_probabilities_to_values(doe, variables)
+    if not isinstance(variables, DesignSpace):
+        variables = DesignSpace(variables)
+    return variables.value_of(doe)
 
 
-def create(variables: list[Variable], sample_size: int,
+def create(variables: VariableCollection, sample_size: int,
            steps: Optional[int] = None,
            scorer: Optional[Scorer] = None
            ) -> np.ndarray:
@@ -37,6 +40,9 @@ def create(variables: list[Variable], sample_size: int,
     :param steps: Number of DoEs to be created to choose the best from
     :return: DoE matrix with shape (len(variables), samples_size)
     """
+    if not isinstance(variables, DesignSpace):
+        variables = DesignSpace(variables)
+
     if steps < 2:
         return _create(variables, sample_size)
 
