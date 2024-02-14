@@ -5,6 +5,15 @@ from scipy import stats
 import experiment_design.variable as module_under_test
 
 
+@pytest.fixture
+def discrete_bernoulli() -> module_under_test.DiscreteVariable:
+    values = [42, 666]
+    return module_under_test.DiscreteVariable(
+        distribution=stats.bernoulli(0.5), value_mapper=lambda x: values[int(x)]
+    )
+
+
+
 class TestContinuousVariable:
 
     def test_fail_distribution(self):
@@ -97,15 +106,16 @@ class TestDiscreteVariable:
         assert var.value_of(1) == 1
         assert var.distribution.dist.name == "bernoulli"
 
-    def test_value_of_with_mapper(self):
-        values = [42, 666
-                  ]  # In general, these should be sorted in ascending order
-        var = module_under_test.DiscreteVariable(
-            distribution=stats.bernoulli(0.5), value_mapper=lambda x: values[int(x)]
-        )
-        assert var.value_of(1e-6) == 42
-        assert var.value_of(1) == 666
-        assert np.all(var.value_of(np.array([1e-6, 1])) == np.array(values))
+    def test_value_of_with_mapper(self, discrete_bernoulli):
+        assert discrete_bernoulli.value_of(1e-6) == 42
+        assert discrete_bernoulli.value_of(1) == 666
+        assert np.all(discrete_bernoulli.value_of(np.array([1e-6, 1])) == np.array([42, 666]))
+
+    def test_get_finite_lower_bound(self, discrete_bernoulli):
+        assert discrete_bernoulli.get_finite_lower_bound() == 42
+
+    def test_get_finite_upper_bound(self, discrete_bernoulli):
+        assert discrete_bernoulli.get_finite_upper_bound() == 666
 
 
 def test_create_continuous_discrete_uniform_variables():
