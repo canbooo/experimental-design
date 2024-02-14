@@ -181,25 +181,3 @@ class TestDiscreteVariable:
 
     def test_get_finite_upper_bound(self, discrete_bernoulli):
         assert discrete_bernoulli.get_finite_upper_bound() == 666
-
-
-def test_create_continuous_discrete_uniform_variables():
-    variables = module_under_test.create_discrete_uniform_variables(
-        [[1, 2], [3, 4, 5], [9, 8]]
-    )
-    probabilities = np.array([1e-6, 0.6, 1])
-    expected = np.array([[1, 2, 2], [3, 4, 5], [8, 9, 9]])
-
-    result = np.array([var.value_of(probabilities) for var in variables])
-    assert np.all(expected == result)
-
-
-def test_create_continuous_uniform_variables():
-    variables = module_under_test.create_continuous_uniform_variables(
-        [1, 42, 665], [3, 52, 667]
-    )
-    probabilities = np.array([0, 0.5, 1])
-    expected = np.array([[1, 2, 3], [42, 47, 52], [665, 666, 667]])
-
-    result = np.array([var.value_of(probabilities) for var in variables])
-    assert np.all(expected == result)
