@@ -42,6 +42,48 @@ class TestContinuousVariable:
         assert var.value_of(0) == -5
         assert var.value_of(0.5) == 0
 
+    def test_finite_lower_bound_given(self):
+        var = module_under_test.ContinuousVariable(
+            distribution=stats.norm(0, 1), lower_bound=-5
+        )
+        assert var.get_finite_lower_bound() == -5
+
+    def test_finite_lower_bound_finite(self):
+        var = module_under_test.ContinuousVariable(
+            distribution=stats.uniform(0, 1)
+        )
+        assert var.get_finite_lower_bound() == 0
+
+    def test_finite_lower_bound_infinite(self):
+        dist = stats.norm(0, 1)
+        tol = 2.5e-2
+        var = module_under_test.ContinuousVariable(
+            distribution=dist
+        )
+        assert np.isclose(var.get_finite_lower_bound(infinite_support_probability_tolerance=tol),
+                          -1.95996)
+
+    def test_finite_upper_bound_given(self):
+        var = module_under_test.ContinuousVariable(
+            distribution=stats.norm(0, 1), upper_bound=5
+        )
+        assert var.get_finite_upper_bound() == 5
+
+    def test_finite_upper_bound_finite(self):
+        var = module_under_test.ContinuousVariable(
+            distribution=stats.uniform(0, 1)
+        )
+        assert var.get_finite_upper_bound() == 1
+
+    def test_finite_upper_bound_infinite(self):
+        dist = stats.norm(0, 1)
+        tol = 2.5e-2
+        var = module_under_test.ContinuousVariable(
+            distribution=dist
+        )
+        assert np.isclose(var.get_finite_upper_bound(infinite_support_probability_tolerance=tol),
+                          1.95996)
+
 
 class TestDiscreteVariable:
 
@@ -57,7 +99,7 @@ class TestDiscreteVariable:
 
     def test_value_of_with_mapper(self):
         values = [42, 666
-                  ] # In general, these should be sorted in ascending order
+                  ]  # In general, these should be sorted in ascending order
         var = module_under_test.DiscreteVariable(
             distribution=stats.bernoulli(0.5), value_mapper=lambda x: values[int(x)]
         )
