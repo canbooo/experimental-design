@@ -139,7 +139,7 @@ class DesignSpace:
             probabilities = probabilities.reshape((-1, len(self.variables)))
         samples = np.zeros(probabilities.shape)
         for i_dim, variable in enumerate(self.variables):
-            samples[:, i_dim] = variable.value_of(samples[:, i_dim])
+            samples[:, i_dim] = variable.value_of(probabilities[:, i_dim])
         return samples
 
     @property
