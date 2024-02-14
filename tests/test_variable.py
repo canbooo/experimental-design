@@ -49,6 +49,47 @@ def design_space(request) -> module_under_test.DesignSpace:
     return module_under_test.DesignSpace(variables)
 
 
+def test_is_frozen_discrete():
+    assert module_under_test.is_frozen_discrete(stats.uniform()) is False
+    assert module_under_test.is_frozen_discrete(stats.bernoulli) is False
+    assert module_under_test.is_frozen_discrete(stats.bernoulli(0.5)) is True
+
+
+def test_is_frozen_continuous():
+    assert module_under_test.is_frozen_continuous(stats.bernoulli(0.5)) is False
+    assert module_under_test.is_frozen_continuous(stats.uniform) is False
+    assert module_under_test.is_frozen_continuous(stats.uniform()) is True
+
+
+def test_create_continuous_discrete_uniform_variables():
+    variables = module_under_test.create_discrete_uniform_variables(
+        [[1, 2], [3, 4, 5], [9, 8]]
+    )
+    probabilities = np.array([1e-6, 0.6, 1])
+    expected = np.array([[1, 2, 2], [3, 4, 5], [8, 9, 9]])
+
+    result = np.array([var.value_of(probabilities) for var in variables])
+    assert np.all(expected == result)
+
+
+def test_create_continuous_uniform_variables():
+    variables = module_under_test.create_continuous_uniform_variables(
+        [1, 42, 665], [3, 52, 667]
+    )
+    probabilities = np.array([0, 0.5, 1])
+    expected = np.array([[1, 2, 3], [42, 47, 52], [665, 666, 667]])
+
+    result = np.array([var.value_of(probabilities) for var in variables])
+    assert np.all(expected == result)
+
+
+def test_create_variables_from_distributions():
+    distributions = [stats.uniform(0, 1), stats.bernoulli(0.5)]
+    variables = module_under_test.create_variables_from_distributions(distributions)
+    assert isinstance(variables[0], module_under_test.ContinuousVariable)
+    assert isinstance(variables[1], module_under_test.DiscreteVariable)
+
+
 class TestContinuousVariable:
     def test_fail_distribution(self):
         with pytest.raises(ValueError):
