@@ -78,7 +78,7 @@ class DiscreteVariable:
     def __post_init__(self) -> None:
         if not is_frozen_discrete(self.distribution):
             raise ValueError("Only frozen discrete distributions are supported.")
-        self.value_mapper = np.frompyfunc(self.value_mapper, nin=1, nout=1)
+        self.value_mapper = np.vectorize(self.value_mapper)
 
     def value_of(self, probability: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         values = self.distribution.ppf(probability)
@@ -176,7 +176,7 @@ def create_discrete_uniform_variables(discrete_sets: list[list[Union[int, float,
                 # i.e. the last entry of discrete_sets will be used for all converters
                 # Check https://stackoverflow.com/questions/19837486/lambda-in-a-loop
                 # for a description as this is expected python behaviour.
-                value_mapper=lambda x, values=discrete_set: values[int(x)]
+                value_mapper=lambda x, values=sorted(discrete_set): values[int(x)]
             )
         )
     return variables
