@@ -27,8 +27,9 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
     - name: Install dependencies
-      run: poetry install --with dev --no-interaction
-    - name: Lint with flake8
+      run: |
+        poetry install --with dev --no-interaction
+    - name: Run pre-commit hooks
       run: |
         pre-commit install
         pre-commit run --from-ref origin/HEAD --to-ref HEAD
