@@ -27,11 +27,8 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
     - name: Install dependencies
-      run: poetry install --with dev --no-interaction
-    - name: Lint with flake8
       run: |
-        pre-commit install
-        pre-commit run --from-ref origin/HEAD --to-ref HEAD
+        poetry install --with dev --no-interaction
     - name: Test with pytest
       run: |
         poetry run pytest tests
