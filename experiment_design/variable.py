@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Optional, Union, Callable, Protocol, Any
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional, Protocol, Union
 
 import numpy as np
 from scipy.stats import randint, rv_continuous, rv_discrete, uniform
@@ -12,18 +12,15 @@ from scipy.stats._distn_infrastructure import rv_frozen
 class Variable(Protocol):
     def value_of(
         self, probability: Union[float, np.ndarray]
-    ) -> Union[float, np.ndarray]:
-        ...
+    ) -> Union[float, np.ndarray]: ...
 
     def get_finite_lower_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
-        ...
+    ) -> float: ...
 
     def get_finite_upper_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 def is_frozen_discrete(dist: Any) -> bool:
@@ -107,37 +104,26 @@ class DiscreteVariable:
         self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         support = self.distribution.support()
-        if not np.all(np.isfinite(support)):
-            return self.value_of(infinite_support_probability_tolerance)
-        # Following test is required because scipy sometimes returns incorrect values for probabilities 0 and 1
-        test = self.distribution.ppf(0.0)
-        if test in range(*support):
-            return self.value_of(0.0)
+        if np.isfinite(support[0]):
+            return self.value_mapper(support[0])
         return self.value_of(infinite_support_probability_tolerance)
 
     def get_finite_upper_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         support = self.distribution.support()
-        if not np.all(np.isfinite(support)):
-            return self.value_of(1 - infinite_support_probability_tolerance)
-        # Following test is required because scipy sometimes returns incorrect values for probabilities 0 and 1
-        test = self.distribution.ppf(1.0)
-        if test in range(*support):
-            return self.value_of(1.0)
-        return self.value_of(infinite_support_probability_tolerance)
+        if np.isfinite(support[1]):
+            return self.value_mapper(support[1])
+        return self.value_of(1 - infinite_support_probability_tolerance)
 
 
 @dataclass
 class DesignSpace:
     variables: list[Variable]
-    _lower_bound: Optional[np.ndarray] = None
-    _upper_bound: Optional[np.ndarray] = None
+    _lower_bound: np.ndarray = field(init=False, repr=False, default=None)
+    _upper_bound: np.ndarray = field(init=False, repr=False, default=None)
 
     def __post_init__(self):
-        self._read_finite_bounds()
-
-    def _read_finite_bounds(self) -> None:
         lower, upper = [], []
         for var in self.variables:
             lower.append(var.get_finite_lower_bound())
@@ -150,30 +136,16 @@ class DesignSpace:
             probabilities = probabilities.reshape((-1, len(self.variables)))
         samples = np.zeros(probabilities.shape)
         for i_dim, variable in enumerate(self.variables):
-            samples[:, i_dim] = variable.value_of(samples[:, i_dim])
+            samples[:, i_dim] = variable.value_of(probabilities[:, i_dim])
         return samples
 
     @property
     def lower_bound(self) -> np.ndarray:
         return self._lower_bound
 
-    @lower_bound.setter
-    def lower_bound(self, new_bound: np.ndarray) -> None:
-        for var, lb in zip(self.variables, new_bound.ravel()):
-            if isinstance(var, ContinuousVariable):
-                var.lower_bound = lb
-        self._read_finite_bounds()
-
     @property
     def upper_bound(self) -> np.ndarray:
         return self._upper_bound
-
-    @upper_bound.setter
-    def upper_bound(self, new_bound: np.ndarray) -> None:
-        for var, ub in zip(self.variables, new_bound.ravel()):
-            if isinstance(var, DiscreteVariable):
-                var.upper_bound = ub
-        self._read_finite_bounds()
 
     @property
     def dimensions(self) -> int:
@@ -219,4 +191,20 @@ def create_continuous_uniform_variables(
     variables = []
     for lower, upper in zip(continuous_lower_bounds, continuous_upper_bounds):
         variables.append(ContinuousVariable(lower_bound=lower, upper_bound=upper))
+    return variables
+
+
+def create_variables_from_distributions(
+    distributions: list[rv_frozen],
+) -> list[Variable]:
+    variables = []
+    for dist in distributions:
+        if is_frozen_discrete(dist):
+            variables.append(DiscreteVariable(distribution=dist))
+        elif is_frozen_continuous(dist):
+            variables.append(ContinuousVariable(distribution=dist))
+        else:
+            raise ValueError(
+                f"Each distribution must be a frozen discrete or continuous type, got {type(dist)}"
+            )
     return variables
