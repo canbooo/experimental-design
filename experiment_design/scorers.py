@@ -12,7 +12,7 @@ class Scorer(Protocol):
         ...
 
 
-def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-8) -> Scorer:
+def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-2) -> Scorer:
     """
     Create a scorer, that computes the maximum absolute correlation error between the samples
     and the target_correlation.
@@ -20,14 +20,14 @@ def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-8) ->
     :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
     representing the linear dependency between the dimensions.
     :param eps: a small positive value to improve the stability of the log operation
-    :return: a scorer that returns the log negative maximum absolute correlation error
+    :return: a scorer that returns the negative log maximum absolute correlation error
     """
     if np.max(np.abs(target_correlation)) > 1:
         raise ValueError("Correlations should be in the interval [-1,1].")
 
     def _scorer(doe: np.ndarray) -> float:
         error = np.max(np.abs(np.corrcoef(doe, rowvar=False) - target_correlation))
-        return np.log(error + eps)
+        return -np.log10(error + eps)
 
     return _scorer
 
@@ -38,11 +38,11 @@ def make_min_pairwise_distance_scorer(max_distance: float = 1.0) -> Scorer:
     :param max_distance: Used for scaling the log
     :return: a scorer that returns the log minimum pairwise distance divided by the log max distance
     """
-    max_log_distance = np.log(max_distance)
+    max_log_distance = np.log10(max_distance)
 
     def _scorer(doe: np.ndarray) -> float:
-        min_pdist = np.log(np.min(pdist(doe)))
-        return min_pdist - max_log_distance
+        min_pairwise_distance = np.log10(np.min(pdist(doe)))
+        return min_pairwise_distance - max_log_distance
 
     return _scorer
 
