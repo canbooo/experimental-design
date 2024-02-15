@@ -62,13 +62,19 @@ def generate_lhd_probabilities(
     target_correlation: np.ndarray,
     central_design: bool = True,
 ) -> np.ndarray:
-    probabilities = create_probabilities(
-        num_variables, sample_size, central_design=central_design
-    )
     target_correlation = get_correlation_matrix(
         target_correlation=target_correlation, num_variables=num_variables
     )
-    return iman_connover_transformation(probabilities, target_correlation)
+    # Sometimes, we may randomly generate probabilities with
+    # singular correlation matrices. Try 3 times to avoid issue until we give up
+    for k in range(3):
+        probabilities = create_probabilities(
+            num_variables, sample_size, central_design=central_design
+        )
+        try:
+            return iman_connover_transformation(probabilities, target_correlation)
+        except np.linalg.LinAlgError:
+            pass
 
 
 def create_fast_orthogonal_design(
