@@ -12,15 +12,18 @@ from scipy.stats._distn_infrastructure import rv_frozen
 class Variable(Protocol):
     def value_of(
         self, probability: Union[float, np.ndarray]
-    ) -> Union[float, np.ndarray]: ...
+    ) -> Union[float, np.ndarray]:
+        ...
 
     def get_finite_lower_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float: ...
+    ) -> float:
+        ...
 
     def get_finite_upper_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float: ...
+    ) -> float:
+        ...
 
 
 def is_frozen_discrete(dist: Any) -> bool:
@@ -29,6 +32,29 @@ def is_frozen_discrete(dist: Any) -> bool:
 
 def is_frozen_continuous(dist: Any) -> bool:
     return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_continuous)
+
+
+def change_field_representation(
+    dataclass_instance: dataclass, representations_to_change: dict[str, Any]
+) -> str:
+    """Just like the default __repr__ but supports reformatting some values."""
+    final = []
+    for current_field in dataclass_instance.__dataclass_fields__.values():
+        if not current_field.repr:
+            continue
+        name = current_field.name
+        value = representations_to_change.get(
+            name, dataclass_instance.__getattribute__(name)
+        )
+        final.append(f"{name}={value}")
+    return f"{dataclass_instance.__class__.__name__}({', '.join(final)})"
+
+
+def create_distribution_representation(distribution: rv_frozen) -> str:
+    args = ", ".join([str(a) for a in distribution.args])
+    kwargs = ", ".join([f"{k}={v}" for k, v in distribution.kwds])
+    params = [a for a in [args, kwargs] if a]
+    return f"{distribution.dist.name}({', '.join(params)})"
 
 
 @dataclass
@@ -83,6 +109,14 @@ class ContinuousVariable:
             return value
         return self.value_of(1 - infinite_support_probability_tolerance)
 
+    def __repr__(self) -> str:
+        distribution_representation = create_distribution_representation(
+            self.distribution
+        )
+        return change_field_representation(
+            self, {"distribution": distribution_representation}
+        )
+
 
 @dataclass
 class DiscreteVariable:
@@ -116,6 +150,14 @@ class DiscreteVariable:
             return self.value_mapper(support[1])
         return self.value_of(1 - infinite_support_probability_tolerance)
 
+    def __repr__(self) -> str:
+        distribution_representation = create_distribution_representation(
+            self.distribution
+        )
+        return change_field_representation(
+            self, {"distribution": distribution_representation}
+        )
+
 
 @dataclass
 class DesignSpace:
@@ -123,7 +165,7 @@ class DesignSpace:
     _lower_bound: np.ndarray = field(init=False, repr=False, default=None)
     _upper_bound: np.ndarray = field(init=False, repr=False, default=None)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         lower, upper = [], []
         for var in self.variables:
             lower.append(var.get_finite_lower_bound())
