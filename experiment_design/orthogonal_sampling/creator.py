@@ -20,7 +20,7 @@ def create_probabilities(
     num_variables: int, sample_size: int, central_design: bool = True
 ):
     doe = uniform.rvs(size=(sample_size, num_variables))
-    doe = (np.argsort(doe, axis=0) - 0.5) / sample_size
+    doe = (np.argsort(doe, axis=0) + 0.5) / sample_size
     if central_design:
         return doe
     delta = 1 / sample_size
