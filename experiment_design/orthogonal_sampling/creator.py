@@ -5,6 +5,7 @@ import numpy as np
 from scipy.linalg import solve_triangular
 from scipy.stats import uniform
 
+from experiment_design.designer import get_init_opt_steps
 from experiment_design.optimize import get_best_try, simulated_annealing_by_perturbation
 from experiment_design.scorers import (
     Scorer,
@@ -102,19 +103,6 @@ def create_fast_orthogonal_design(
         )
     doe = create_probabilities(len(variables), sample_size, central_design=True)
     return variables.value_of(doe)
-
-
-def get_init_opt_steps(
-    samples_size: int, steps: Optional[int] = None, proportion: float = 0.1
-) -> tuple[int, int]:
-    if steps is None:
-        if samples_size <= 100:
-            steps = 20000
-        else:
-            steps = 2000
-    init_steps = max(1, round(proportion * steps))
-    opt_steps = max(1, steps - init_steps)
-    return init_steps, opt_steps
 
 
 class OrthogonalDesignCreator:

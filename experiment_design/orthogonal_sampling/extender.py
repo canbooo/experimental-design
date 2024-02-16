@@ -176,11 +176,11 @@ def make_default_local_scorer(
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
+    from experiment_design.designer import get_init_opt_steps
     from experiment_design.orthogonal_sampling.creator import (
         OrthogonalDesignCreator,
         create_fast_orthogonal_design,
         create_probabilities,
-        get_init_opt_steps,
     )
     from experiment_design.variable import (
         DesignSpace,
