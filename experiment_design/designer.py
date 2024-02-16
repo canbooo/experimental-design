@@ -13,7 +13,7 @@ from experiment_design.variable import DesignSpace, VariableCollection
 INITIAL_OPTIMIZATION_PROPORTION = 0.1
 
 
-class DesignCreator(abc.ABC):
+class Designer(abc.ABC):
 
     def __init__(
         self,
