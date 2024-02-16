@@ -1,4 +1,4 @@
-from typing import Protocol, Union, Optional
+from typing import Optional, Protocol, Union
 
 import numpy as np
 from scipy.spatial.distance import pdist
@@ -8,8 +8,7 @@ from experiment_design.variable import DesignSpace
 
 
 class Scorer(Protocol):
-    def __call__(self, doe: np.ndarray) -> float:
-        ...
+    def __call__(self, doe: np.ndarray) -> float: ...
 
 
 def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-2) -> Scorer:

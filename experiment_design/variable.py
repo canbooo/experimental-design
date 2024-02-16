@@ -12,18 +12,15 @@ from scipy.stats._distn_infrastructure import rv_frozen
 class Variable(Protocol):
     def value_of(
         self, probability: Union[float, np.ndarray]
-    ) -> Union[float, np.ndarray]:
-        ...
+    ) -> Union[float, np.ndarray]: ...
 
     def get_finite_lower_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
-        ...
+    ) -> float: ...
 
     def get_finite_upper_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 def is_frozen_discrete(dist: Any) -> bool:
