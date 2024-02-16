@@ -11,17 +11,17 @@ from scipy.stats._distn_infrastructure import rv_frozen
 
 class Variable(Protocol):
     def value_of(
-        self, probability: Union[float, np.ndarray]
+            self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
         ...
 
     def get_finite_lower_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
+            self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         ...
 
     def get_finite_upper_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
+            self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         ...
 
@@ -35,7 +35,7 @@ def is_frozen_continuous(dist: Any) -> bool:
 
 
 def change_field_representation(
-    dataclass_instance: dataclass, representations_to_change: dict[str, Any]
+        dataclass_instance: dataclass, representations_to_change: dict[str, Any]
 ) -> str:
     """Just like the default __repr__ but supports reformatting some values."""
     final = []
@@ -74,23 +74,27 @@ class ContinuousVariable:
                 self.lower_bound, self.upper_bound - self.lower_bound
             )
         if (
-            None not in [self.lower_bound, self.upper_bound]
-            and self.lower_bound >= self.upper_bound
+                None not in [self.lower_bound, self.upper_bound]
+                and self.lower_bound >= self.upper_bound
         ):
             raise ValueError("lower_bound has to be smaller than upper_bound")
         if not is_frozen_continuous(self.distribution):
             raise ValueError("Only frozen continuous distributions are supported.")
 
     def value_of(
-        self, probability: Union[float, np.ndarray]
+            self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
         values = self.distribution.ppf(probability)
         if self.upper_bound is not None or self.lower_bound is not None:
             return np.clip(values, self.lower_bound, self.upper_bound)
         return values
 
+    def cdf_of(self, value: Union[float, np.ndarray]
+               ) -> Union[float, np.ndarray]:
+        return self.distribution.cdf(value)
+
     def get_finite_lower_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
+            self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         if self.lower_bound is not None:
             return self.lower_bound
@@ -100,7 +104,7 @@ class ContinuousVariable:
         return self.value_of(infinite_support_probability_tolerance)
 
     def get_finite_upper_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
+            self, infinite_support_probability_tolerance: float = 1e-6
     ):
         if self.upper_bound is not None:
             return self.upper_bound
@@ -122,20 +126,26 @@ class ContinuousVariable:
 class DiscreteVariable:
     distribution: rv_frozen
     value_mapper: Callable[[float], Union[float, int]] = lambda x: x
+    inverse_value_mapper: Callable[[float, int], Union[float]] = lambda x: x
 
     def __post_init__(self) -> None:
         if not is_frozen_discrete(self.distribution):
             raise ValueError("Only frozen discrete distributions are supported.")
         self.value_mapper = np.vectorize(self.value_mapper)
+        self.inverse_value_mapper = np.vectorize(self.inverse_value_mapper)
 
     def value_of(
-        self, probability: Union[float, np.ndarray]
+            self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
         values = self.distribution.ppf(probability)
         return self.value_mapper(values)
 
+    def cdf_of(self, values: Union[float, np.ndarray]
+               ) -> Union[float, np.ndarray]:
+        return self.distribution.cdf(self.inverse_value_mapper(values))
+
     def get_finite_lower_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
+            self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         support = self.distribution.support()
         if np.isfinite(support[0]):
@@ -143,7 +153,7 @@ class DiscreteVariable:
         return self.value_of(infinite_support_probability_tolerance)
 
     def get_finite_upper_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
+            self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
         support = self.distribution.support()
         if np.isfinite(support[1]):
@@ -173,13 +183,19 @@ class DesignSpace:
         self._lower_bound = np.array(lower)
         self._upper_bound = np.array(upper)
 
-    def value_of(self, probabilities: np.ndarray) -> np.ndarray:
-        if len(probabilities.shape) != 2:
-            probabilities = probabilities.reshape((-1, len(self.variables)))
-        samples = np.zeros(probabilities.shape)
+    def _map_by(self, attribute: str, values: np.ndarray) -> np.ndarray:
+        if len(values.shape) != 2:
+            values = values.reshape((-1, len(self.variables)))
+        results = np.zeros(values.shape)
         for i_dim, variable in enumerate(self.variables):
-            samples[:, i_dim] = variable.value_of(probabilities[:, i_dim])
-        return samples
+            results[:, i_dim] = getattr(variable, attribute)(values[:, i_dim])
+        return results
+
+    def value_of(self, probabilities: np.ndarray) -> np.ndarray:
+        return self._map_by("value_of", probabilities)
+
+    def cdf_of(self, values: np.ndarray) -> np.ndarray:
+        return self._map_by("cdf_of", values)
 
     @property
     def lower_bound(self) -> np.ndarray:
@@ -198,7 +214,7 @@ class DesignSpace:
 
 
 def create_discrete_uniform_variables(
-    discrete_sets: list[list[Union[int, float, str]]]
+        discrete_sets: list[list[Union[int, float, str]]]
 ) -> list[DiscreteVariable]:
     variables = []
     for discrete_set in discrete_sets:
@@ -218,13 +234,15 @@ def create_discrete_uniform_variables(
                 # Check https://stackoverflow.com/questions/19837486/lambda-in-a-loop
                 # for a description as this is expected python behaviour.
                 value_mapper=lambda x, values=sorted(discrete_set): values[int(x)],
+                inverse_value_mapper=lambda x, values=sorted(discrete_set): values.index(x),
+
             )
         )
     return variables
 
 
 def create_continuous_uniform_variables(
-    continuous_lower_bounds: list[float], continuous_upper_bounds: list[float]
+        continuous_lower_bounds: list[float], continuous_upper_bounds: list[float]
 ) -> list[Union[DiscreteVariable, ContinuousVariable]]:
     if len(continuous_lower_bounds) != len(continuous_upper_bounds):
         raise ValueError(
@@ -237,7 +255,7 @@ def create_continuous_uniform_variables(
 
 
 def create_variables_from_distributions(
-    distributions: list[rv_frozen],
+        distributions: list[rv_frozen],
 ) -> list[Variable]:
     variables = []
     for dist in distributions:
