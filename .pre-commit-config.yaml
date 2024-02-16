@@ -11,7 +11,7 @@ repos:
     rev: 5.12.0
     hooks:
       - id: isort
-        args: [ "--profile", "black" ]
+        args: [ "--profile", "black", "--skip", "experiment_design/variable/__init__.py", "--filter-files"]
   - repo: https://github.com/psf/black
     rev: 24.2.0
     hooks:
