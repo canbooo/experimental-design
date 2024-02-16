@@ -167,7 +167,9 @@ class OrthogonalDesignCreator:
         target_correlation = get_correlation_matrix(
             self.target_correlation, num_variables=num_variables
         )
-        init_scorer = make_corr_error_scorer(target_correlation)
+        if scorer is None:
+            scorer = make_default_scorer(variables, target_correlation)
+
         doe = get_best_try(
             partial(
                 generate_lhd_probabilities,
@@ -176,11 +178,10 @@ class OrthogonalDesignCreator:
                 target_correlation,
                 central_design=self.central_design,
             ),
-            init_scorer,
+            scorer,
             init_steps,
         )
-        if scorer is None:
-            scorer = make_default_scorer(variables, target_correlation)
+
         doe = variables.value_of(doe)
         return simulated_annealing_by_perturbation(
             doe, scorer, steps=opt_steps, verbose=self.verbose
