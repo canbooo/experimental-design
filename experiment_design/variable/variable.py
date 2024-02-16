@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable, Optional, Protocol, Union
 
 import numpy as np
 from scipy.stats import randint, rv_continuous, rv_discrete, uniform
@@ -7,8 +7,6 @@ from scipy.stats import randint, rv_continuous, rv_discrete, uniform
 # Following is ugly, but it is scipy's fault for not exposing rv_frozen
 # noinspection PyProtectedMember
 from scipy.stats._distn_infrastructure import rv_frozen
-
-from experiment_design.variable.types import Variable
 
 
 def is_frozen_discrete(dist: Any) -> bool:
@@ -168,62 +166,6 @@ class DiscreteVariable:
         )
 
 
-@dataclass
-class DesignSpace:
-    variables: list[Variable]
-    _lower_bound: np.ndarray = field(init=False, repr=False, default=None)
-    _upper_bound: np.ndarray = field(init=False, repr=False, default=None)
-
-    def __post_init__(self) -> None:
-        lower, upper = [], []
-        for var in self.variables:
-            lower.append(var.get_finite_lower_bound())
-            upper.append(var.get_finite_upper_bound())
-        self._lower_bound = np.array(lower)
-        self._upper_bound = np.array(upper)
-
-    def _map_by(self, attribute: str, values: np.ndarray) -> np.ndarray:
-        if len(values.shape) != 2:
-            values = values.reshape((-1, len(self.variables)))
-        results = np.zeros(values.shape)
-        for i_dim, variable in enumerate(self.variables):
-            results[:, i_dim] = getattr(variable, attribute)(values[:, i_dim])
-        return results
-
-    def value_of(self, probabilities: np.ndarray) -> np.ndarray:
-        """
-        Given an array of probabilities, return the coordinates of the corresponding
-        point in the space using the inverse cdf of variable distributions
-        """
-        return self._map_by("value_of", probabilities)
-
-    def cdf_of(self, values: np.ndarray) -> np.ndarray:
-        """
-        Given an array of values, return the coordinates of the corresponding
-        marginal probabilities in the space using the cdf of variable distributions
-        """
-        return self._map_by("cdf_of", values)
-
-    @property
-    def lower_bound(self) -> np.ndarray:
-        """Finite lower bound of the space"""
-        return self._lower_bound
-
-    @property
-    def upper_bound(self) -> np.ndarray:
-        """Finite upper bound of the space"""
-        return self._upper_bound
-
-    @property
-    def dimensions(self) -> int:
-        """Size of the space, i.e. the number of dimensions"""
-        return len(self.variables)
-
-    def __len__(self):
-        """Size of the space, i.e. the number of dimensions"""
-        return self.dimensions
-
-
 def create_discrete_uniform_variables(
     discrete_sets: list[list[Union[int, float, str]]]
 ) -> list[DiscreteVariable]:
@@ -271,6 +213,36 @@ def create_continuous_uniform_variables(
     for lower, upper in zip(continuous_lower_bounds, continuous_upper_bounds):
         variables.append(ContinuousVariable(lower_bound=lower, upper_bound=upper))
     return variables
+
+
+class Variable(Protocol):
+    def value_of(
+        self, probability: Union[float, np.ndarray]
+    ) -> Union[float, np.ndarray]:
+        """
+        Given a probability or an array of probabilities,
+        return the value using the inverse cdf of the distribution
+        """
+
+    def cdf_of(self, value: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+        Given a value or an array of values,
+        return the probability using the cdf of the distribution
+        """
+
+    def get_finite_lower_bound(self) -> float:
+        """
+        Return a lower bound to be used for the experiment design.
+        If the user passed a lower bound or the variable distribution has a finite one,
+        it will be returned. Otherwise, return an appropriate finite value.
+        """
+
+    def get_finite_upper_bound(self) -> float:
+        """
+        Return an upper bound to be used for the experiment design.
+        If the user passed an upper bound or the variable distribution has a finite one,
+        it will be returned. Otherwise, return an appropriate finite value.
+        """
 
 
 def create_variables_from_distributions(

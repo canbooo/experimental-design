@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial.distance import pdist
 
 from experiment_design.variable import DesignSpace
-from experiment_design.variable.types import VariableCollection
+from experiment_design.variable.space import VariableCollection
 
 
 class Scorer(Protocol):
