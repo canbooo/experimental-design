@@ -19,6 +19,24 @@ class Scorer(Protocol):
         ...
 
 
+class CreationScoreFactory(Protocol):
+    def __call__(self, variables: VariableCollection, sample_size: int) -> Scorer:
+        """
+        Given variables and sample size, create a scoring function
+        """
+        ...
+
+
+class ExtensionScoreFactory(Protocol):
+    def __call__(
+        self, old_samples: np.ndarray, variables: VariableCollection, sample_size: int
+    ) -> Scorer:
+        """
+        Given variables and sample size, create a scoring function
+        """
+        ...
+
+
 def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-2) -> Scorer:
     """
     Create a scorer, that computes the maximum absolute correlation error between the samples
