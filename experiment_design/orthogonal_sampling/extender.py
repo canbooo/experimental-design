@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Optional, Union
 
 import numpy as np
 from scipy.stats import uniform
@@ -17,11 +17,12 @@ def find_empty_bins(probabilities: np.ndarray, bins_per_dimension: int) -> np.nd
     """
     empty_bins = np.ones((bins_per_dimension, probabilities.shape[1]), dtype=bool)
     edges = np.arange(bins_per_dimension + 1) / bins_per_dimension
-    for i_bin in range(bins_per_dimension):
+    edges = edges.reshape((-1, 1))
+    for i_dim in range(probabilities.shape[1]):
         condition = np.logical_and(
-            probabilities > edges[i_bin], probabilities <= edges[i_bin + 1]
+            probabilities[:, i_dim] >= edges[:-1], probabilities[:, i_dim] < edges[1:]
         )
-        empty_bins[i_bin, :] = np.logical_not(condition.any(0))
+        empty_bins[:, i_dim] = np.logical_not(condition.any(1))
     return empty_bins
 
 
@@ -31,6 +32,7 @@ class OrthogonalDesignExtender:
         target_correlation: Union[np.ndarray, float] = 0.0,
         central_design: bool = False,
         dense_filling: bool = True,
+        verbose: int = 0,
     ) -> None:
         self.target_correlation = target_correlation
         self.central_design = central_design
@@ -38,6 +40,7 @@ class OrthogonalDesignExtender:
             self.empty_size_check = np.max
         else:
             self.empty_size_check = np.min
+        self.verbose = verbose
 
     def __call__(
         self,
@@ -67,14 +70,15 @@ class OrthogonalDesignExtender:
                 "Non-finite probabilitiy encountered. Please check the distributions."
             )
 
-        bins_per_dimension = sample_size
+        bins_per_dimension = sample_size + old_sample.shape[0]
         empty = find_empty_bins(probabilities, bins_per_dimension)
         rows, cols = np.where(empty)
-        while np.max(np.unique(cols, return_counts=True)[1]) < sample_size:
+        while (
+            self.empty_size_check(np.unique(cols, return_counts=True)[1]) < sample_size
+        ):
             bins_per_dimension += 1
             empty = find_empty_bins(probabilities, bins_per_dimension)
             rows, cols = np.where(empty)
-        print(np.unique(cols, return_counts=True))
 
         delta = 1 / bins_per_dimension
         doe = np.empty((sample_size, len(variables)))
@@ -98,18 +102,19 @@ class OrthogonalDesignExtender:
 
 
 if __name__ == "__main__":
-    from experiment_design.variable import (
-        create_continuous_uniform_variables,
-        DesignSpace,
-    )
+    import matplotlib.pyplot as plt
+
     from experiment_design.orthogonal_sampling.creator import (
         OrthogonalDesignCreator,
         create_fast_orthogonal_design,
         create_probabilities,
     )
-    import matplotlib.pyplot as plt
+    from experiment_design.variable import (
+        DesignSpace,
+        create_continuous_uniform_variables,
+    )
 
-    np.random.seed(666)
+    # np.random.seed(666)
     sample_size = 8
     lb, ub = -2, 2
     vars = create_continuous_uniform_variables([lb, lb], [ub, ub])
