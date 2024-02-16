@@ -29,7 +29,7 @@ class CreationScoreFactory(Protocol):
 
 class ExtensionScoreFactory(Protocol):
     def __call__(
-        self, old_samples: np.ndarray, variables: VariableCollection, sample_size: int
+        self, old_sample: np.ndarray, variables: VariableCollection, sample_size: int
     ) -> Scorer:
         """
         Given variables and sample size, create a scoring function

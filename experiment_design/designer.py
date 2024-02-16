@@ -1,9 +1,13 @@
 import abc
-from typing import Optional, Protocol
+from typing import Optional
 
 import numpy as np
 
-from experiment_design.scorers import ScoreFactory, Scorer
+from experiment_design.scorers import (
+    CreationScoreFactory,
+    ExtensionScoreFactory,
+    Scorer,
+)
 from experiment_design.variable import DesignSpace, VariableCollection
 
 INITIAL_OPTIMIZATION_PROPORTION = 0.1
@@ -13,8 +17,8 @@ class DesignCreator(abc.ABC):
 
     def __init__(
         self,
-        creation_score_factory: ScoreFactory,
-        extension_score_factory: ScoreFactory,
+        creation_score_factory: CreationScoreFactory,
+        extension_score_factory: ExtensionScoreFactory,
         initial_optimization_proportion: float = INITIAL_OPTIMIZATION_PROPORTION,
     ):
         self.creation_score_factory = creation_score_factory
@@ -70,7 +74,7 @@ class DesignCreator(abc.ABC):
         """
         if not isinstance(variables, DesignSpace):
             variables = DesignSpace(variables)
-        scorer = self.extension_score_factory(variables, sample_size)
+        scorer = self.extension_score_factory(old_sample, variables, sample_size)
         initial_steps, final_steps = get_init_opt_steps(
             sample_size, steps, proportion=self.initial_optimization_proportion
         )
