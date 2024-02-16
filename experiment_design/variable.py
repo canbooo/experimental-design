@@ -31,6 +31,29 @@ def is_frozen_continuous(dist: Any) -> bool:
     return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_continuous)
 
 
+def change_field_representation(
+    dataclass_instance: dataclass, representations_to_change: dict[str, Any]
+) -> str:
+    """Just like the default __repr__ but supports reformatting some values."""
+    final = []
+    for current_field in dataclass_instance.__dataclass_fields__.values():
+        if not current_field.repr:
+            continue
+        name = current_field.name
+        value = representations_to_change.get(
+            name, dataclass_instance.__getattribute__(name)
+        )
+        final.append(f"{name}={value}")
+    return f"{dataclass_instance.__class__.__name__}({', '.join(final)})"
+
+
+def create_distribution_representation(distribution: rv_frozen) -> str:
+    args = ", ".join([str(a) for a in distribution.args])
+    kwargs = ", ".join([f"{k}={v}" for k, v in distribution.kwds])
+    params = [a for a in [args, kwargs] if a]
+    return f"{distribution.dist.name}({', '.join(params)})"
+
+
 @dataclass
 class ContinuousVariable:
     distribution: Optional[rv_frozen] = None
@@ -63,6 +86,9 @@ class ContinuousVariable:
             return np.clip(values, self.lower_bound, self.upper_bound)
         return values
 
+    def cdf_of(self, value: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        return self.distribution.cdf(value)
+
     def get_finite_lower_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
     ) -> float:
@@ -83,22 +109,35 @@ class ContinuousVariable:
             return value
         return self.value_of(1 - infinite_support_probability_tolerance)
 
+    def __repr__(self) -> str:
+        distribution_representation = create_distribution_representation(
+            self.distribution
+        )
+        return change_field_representation(
+            self, {"distribution": distribution_representation}
+        )
+
 
 @dataclass
 class DiscreteVariable:
     distribution: rv_frozen
     value_mapper: Callable[[float], Union[float, int]] = lambda x: x
+    inverse_value_mapper: Callable[[float, int], Union[float]] = lambda x: x
 
     def __post_init__(self) -> None:
         if not is_frozen_discrete(self.distribution):
             raise ValueError("Only frozen discrete distributions are supported.")
         self.value_mapper = np.vectorize(self.value_mapper)
+        self.inverse_value_mapper = np.vectorize(self.inverse_value_mapper)
 
     def value_of(
         self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
         values = self.distribution.ppf(probability)
         return self.value_mapper(values)
+
+    def cdf_of(self, values: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        return self.distribution.cdf(self.inverse_value_mapper(values))
 
     def get_finite_lower_bound(
         self, infinite_support_probability_tolerance: float = 1e-6
@@ -116,6 +155,14 @@ class DiscreteVariable:
             return self.value_mapper(support[1])
         return self.value_of(1 - infinite_support_probability_tolerance)
 
+    def __repr__(self) -> str:
+        distribution_representation = create_distribution_representation(
+            self.distribution
+        )
+        return change_field_representation(
+            self, {"distribution": distribution_representation}
+        )
+
 
 @dataclass
 class DesignSpace:
@@ -123,7 +170,7 @@ class DesignSpace:
     _lower_bound: np.ndarray = field(init=False, repr=False, default=None)
     _upper_bound: np.ndarray = field(init=False, repr=False, default=None)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         lower, upper = [], []
         for var in self.variables:
             lower.append(var.get_finite_lower_bound())
@@ -131,13 +178,19 @@ class DesignSpace:
         self._lower_bound = np.array(lower)
         self._upper_bound = np.array(upper)
 
-    def value_of(self, probabilities: np.ndarray) -> np.ndarray:
-        if len(probabilities.shape) != 2:
-            probabilities = probabilities.reshape((-1, len(self.variables)))
-        samples = np.zeros(probabilities.shape)
+    def _map_by(self, attribute: str, values: np.ndarray) -> np.ndarray:
+        if len(values.shape) != 2:
+            values = values.reshape((-1, len(self.variables)))
+        results = np.zeros(values.shape)
         for i_dim, variable in enumerate(self.variables):
-            samples[:, i_dim] = variable.value_of(probabilities[:, i_dim])
-        return samples
+            results[:, i_dim] = getattr(variable, attribute)(values[:, i_dim])
+        return results
+
+    def value_of(self, probabilities: np.ndarray) -> np.ndarray:
+        return self._map_by("value_of", probabilities)
+
+    def cdf_of(self, values: np.ndarray) -> np.ndarray:
+        return self._map_by("cdf_of", values)
 
     @property
     def lower_bound(self) -> np.ndarray:
@@ -176,6 +229,9 @@ def create_discrete_uniform_variables(
                 # Check https://stackoverflow.com/questions/19837486/lambda-in-a-loop
                 # for a description as this is expected python behaviour.
                 value_mapper=lambda x, values=sorted(discrete_set): values[int(x)],
+                inverse_value_mapper=lambda x, values=sorted(
+                    discrete_set
+                ): values.index(x),
             )
         )
     return variables

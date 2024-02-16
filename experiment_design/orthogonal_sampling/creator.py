@@ -1,16 +1,16 @@
-from typing import Union, Optional
 from functools import partial
+from typing import Optional, Union
 
 import numpy as np
-from scipy.stats import uniform
 from scipy.linalg import solve_triangular
+from scipy.stats import uniform
 
 from experiment_design.optimize import get_best_try, simulated_annealing_by_perturbation
 from experiment_design.scorers import (
-    get_correlation_matrix,
     Scorer,
-    make_default_scorer,
+    get_correlation_matrix,
     make_corr_error_scorer,
+    make_default_scorer,
 )
 from experiment_design.types import VariableCollection
 from experiment_design.variable import DesignSpace
@@ -20,7 +20,7 @@ def create_probabilities(
     num_variables: int, sample_size: int, central_design: bool = True
 ):
     doe = uniform.rvs(size=(sample_size, num_variables))
-    doe = (np.argsort(doe, axis=0) - 0.5) / sample_size
+    doe = (np.argsort(doe, axis=0) + 0.5) / sample_size
     if central_design:
         return doe
     delta = 1 / sample_size
@@ -62,13 +62,19 @@ def generate_lhd_probabilities(
     target_correlation: np.ndarray,
     central_design: bool = True,
 ) -> np.ndarray:
-    probabilities = create_probabilities(
-        num_variables, sample_size, central_design=central_design
-    )
     target_correlation = get_correlation_matrix(
         target_correlation=target_correlation, num_variables=num_variables
     )
-    return iman_connover_transformation(probabilities, target_correlation)
+    # Sometimes, we may randomly generate probabilities with
+    # singular correlation matrices. Try 3 times to avoid issue until we give up
+    for k in range(3):
+        probabilities = create_probabilities(
+            num_variables, sample_size, central_design=central_design
+        )
+        try:
+            return iman_connover_transformation(probabilities, target_correlation)
+        except np.linalg.LinAlgError:
+            pass
 
 
 def create_fast_orthogonal_design(
@@ -100,7 +106,7 @@ def create_fast_orthogonal_design(
     return variables.value_of(doe)
 
 
-def _get_init_opt_steps(
+def get_init_opt_steps(
     samples_size: int, steps: Optional[int] = None, proportion: float = 0.1
 ) -> tuple[int, int]:
     if steps is None:
@@ -118,9 +124,11 @@ class OrthogonalDesignCreator:
         self,
         target_correlation: Union[np.ndarray, float] = 0.0,
         central_design: bool = False,
+        verbose: int = 0,
     ) -> None:
         self.target_correlation = target_correlation
         self.central_design = central_design
+        self.verbose = verbose
 
     def __call__(
         self,
@@ -146,7 +154,7 @@ class OrthogonalDesignCreator:
         target_correlation = get_correlation_matrix(
             self.target_correlation, num_variables=num_variables
         )
-        init_steps, opt_steps = _get_init_opt_steps(sample_size, steps=steps)
+        init_steps, opt_steps = get_init_opt_steps(sample_size, steps=steps)
         if (init_steps + opt_steps) <= 2:
             # Enable faster use cases:
             doe = generate_lhd_probabilities(
@@ -159,7 +167,9 @@ class OrthogonalDesignCreator:
         target_correlation = get_correlation_matrix(
             self.target_correlation, num_variables=num_variables
         )
-        init_scorer = make_corr_error_scorer(target_correlation)
+        if scorer is None:
+            scorer = make_default_scorer(variables, target_correlation)
+
         doe = get_best_try(
             partial(
                 generate_lhd_probabilities,
@@ -168,10 +178,11 @@ class OrthogonalDesignCreator:
                 target_correlation,
                 central_design=self.central_design,
             ),
-            init_scorer,
+            scorer,
             init_steps,
         )
-        if scorer is None:
-            scorer = make_default_scorer(variables, target_correlation)
+
         doe = variables.value_of(doe)
-        return simulated_annealing_by_perturbation(doe, scorer, steps=opt_steps)
+        return simulated_annealing_by_perturbation(
+            doe, scorer, steps=opt_steps, verbose=self.verbose
+        )
