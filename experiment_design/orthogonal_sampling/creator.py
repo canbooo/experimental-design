@@ -1,16 +1,16 @@
-from typing import Union, Optional
 from functools import partial
+from typing import Optional, Union
 
 import numpy as np
-from scipy.stats import uniform
 from scipy.linalg import solve_triangular
+from scipy.stats import uniform
 
 from experiment_design.optimize import get_best_try, simulated_annealing_by_perturbation
 from experiment_design.scorers import (
-    get_correlation_matrix,
     Scorer,
-    make_default_scorer,
+    get_correlation_matrix,
     make_corr_error_scorer,
+    make_default_scorer,
 )
 from experiment_design.types import VariableCollection
 from experiment_design.variable import DesignSpace
@@ -124,9 +124,11 @@ class OrthogonalDesignCreator:
         self,
         target_correlation: Union[np.ndarray, float] = 0.0,
         central_design: bool = False,
+        verbose: int = 0,
     ) -> None:
         self.target_correlation = target_correlation
         self.central_design = central_design
+        self.verbose = verbose
 
     def __call__(
         self,
@@ -180,4 +182,6 @@ class OrthogonalDesignCreator:
         if scorer is None:
             scorer = make_default_scorer(variables, target_correlation)
         doe = variables.value_of(doe)
-        return simulated_annealing_by_perturbation(doe, scorer, steps=opt_steps)
+        return simulated_annealing_by_perturbation(
+            doe, scorer, steps=opt_steps, verbose=self.verbose
+        )
