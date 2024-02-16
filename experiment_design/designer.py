@@ -25,12 +25,6 @@ class DesignCreator(abc.ABC):
         self.extension_score_factory = extension_score_factory
         self.initial_optimization_proportion = initial_optimization_proportion
 
-    @abc.abstractmethod
-    def make_create_scorer(
-        self, variables: VariableCollection, sample_size: int
-    ) -> Scorer:
-        raise NotImplementedError
-
     def create(
         self,
         variables: VariableCollection,
