@@ -106,7 +106,7 @@ def create_fast_orthogonal_design(
     return variables.value_of(doe)
 
 
-def _get_init_opt_steps(
+def get_init_opt_steps(
     samples_size: int, steps: Optional[int] = None, proportion: float = 0.1
 ) -> tuple[int, int]:
     if steps is None:
@@ -154,7 +154,7 @@ class OrthogonalDesignCreator:
         target_correlation = get_correlation_matrix(
             self.target_correlation, num_variables=num_variables
         )
-        init_steps, opt_steps = _get_init_opt_steps(sample_size, steps=steps)
+        init_steps, opt_steps = get_init_opt_steps(sample_size, steps=steps)
         if (init_steps + opt_steps) <= 2:
             # Enable faster use cases:
             doe = generate_lhd_probabilities(

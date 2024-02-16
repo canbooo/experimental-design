@@ -3,9 +3,11 @@ from typing import Optional, Union
 import numpy as np
 from scipy.stats import uniform
 
-from experiment_design.scorers import Scorer
+from experiment_design.optimize import simulated_annealing_by_perturbation
+from experiment_design.scorers import Scorer, make_corr_error_scorer, make_min_pairwise_distance_scorer
 from experiment_design.types import VariableCollection
 
+DEFAULT_CORRELATION_SCORE_WEIGHT = 0.2
 
 def find_empty_bins(probabilities: np.ndarray, bins_per_dimension: int) -> np.ndarray:
     """
@@ -71,6 +73,7 @@ class OrthogonalDesignExtender:
             )
 
         bins_per_dimension = sample_size + old_sample.shape[0]
+        init_steps, opt_steps = get_init_opt_steps(bins_per_dimension, steps=steps)
         empty = find_empty_bins(probabilities, bins_per_dimension)
         rows, cols = np.where(empty)
         while (
@@ -81,7 +84,7 @@ class OrthogonalDesignExtender:
             rows, cols = np.where(empty)
 
         delta = 1 / bins_per_dimension
-        doe = np.empty((sample_size, len(variables)))
+        new_sample = np.empty((sample_size, len(variables)))
         for i_dim in range(len(variables)):
             values = rows[cols == i_dim]
             np.random.shuffle(values)
@@ -94,11 +97,30 @@ class OrthogonalDesignExtender:
                 ]
                 extra = np.random.choice(available, diff, replace=False)
                 values = np.append(extra, values)
-            doe[:, i_dim] = values * delta + delta / 2
+            new_sample[:, i_dim] = values * delta + delta / 2
         if not self.central_design:
-            doe += uniform(-delta / 2, delta).rvs(size=(sample_size, len(variables)))
-        # TODO: Optimization
-        return variables.value_of(doe)
+            new_sample += uniform(-delta / 2, delta).rvs(size=(sample_size, len(variables)))
+        new_sample = variables.value_of(new_sample)
+
+        if scorer is None:
+            lower, upper = variables.lower_bound[None, :], variables.upper_bound[None, :]
+            local_mask = np.logical_and((old_sample >= lower).all(1),
+                                  (old_sample <= upper).all(1))
+
+            corr_scorer = make_corr_error_scorer(self.target_correlation)
+            lower = np.minimum(lower, old_sample.min(0))
+            upper = np.minimum(upper, old_sample.max(0))
+            max_distance = np.linalg.norm(upper - lower)
+            dist_scorer = make_min_pairwise_distance_scorer(max_distance)
+
+            def scorer(doe: np.ndarray) -> float:
+                dist_score = dist_scorer(np.append(old_sample, doe, axis=0))
+                corr_score = corr_scorer(np.append(old_sample[local_mask], doe, axis=0))
+                return dist_score + DEFAULT_CORRELATION_SCORE_WEIGHT * corr_score
+
+        return simulated_annealing_by_perturbation(
+            new_sample, scorer, steps=opt_steps, verbose=self.verbose
+        )
 
 
 if __name__ == "__main__":
@@ -107,8 +129,8 @@ if __name__ == "__main__":
     from experiment_design.orthogonal_sampling.creator import (
         OrthogonalDesignCreator,
         create_fast_orthogonal_design,
-        create_probabilities,
-    )
+        create_probabilities, get_init_opt_steps,
+)
     from experiment_design.variable import (
         DesignSpace,
         create_continuous_uniform_variables,
