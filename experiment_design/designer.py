@@ -1,10 +1,9 @@
-from typing import Protocol, Optional
+from typing import Optional, Protocol
 
 import numpy as np
 
-
 from experiment_design.scorers import Scorer
-from experiment_design.types import VariableCollection
+from experiment_design.variable import VariableCollection
 
 
 class DesignCreator(Protocol):

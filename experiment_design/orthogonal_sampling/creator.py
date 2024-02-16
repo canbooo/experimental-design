@@ -9,11 +9,9 @@ from experiment_design.optimize import get_best_try, simulated_annealing_by_pert
 from experiment_design.scorers import (
     Scorer,
     get_correlation_matrix,
-    make_corr_error_scorer,
     make_default_scorer,
 )
-from experiment_design.types import VariableCollection
-from experiment_design.variable import DesignSpace
+from experiment_design.variable import DesignSpace, VariableCollection
 
 
 def create_probabilities(

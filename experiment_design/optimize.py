@@ -1,7 +1,7 @@
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable
 
 import numpy as np
 from scipy.special import comb as combine
@@ -94,7 +94,7 @@ should be Part of scoring but was in optimize
                               (doe_old <= locs[1]).all(1))
         appender_loc = lambda x: np.append(doe_old[locs].reshape((-1, x.shape[1])), x, axis=0)
         appender = lambda x: np.append(doe_old, x, axis=0)  # will be used for calculating score
-    
+
     dist_max = np.max(appender(doe_start), axis=0) - np.min(appender(doe_start), axis=0)
     dist_max = np.log(np.sqrt(np.sum(dist_max ** 2)))
 """

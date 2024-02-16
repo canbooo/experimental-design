@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Protocol, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 import numpy as np
 from scipy.stats import randint, rv_continuous, rv_discrete, uniform
@@ -8,19 +8,7 @@ from scipy.stats import randint, rv_continuous, rv_discrete, uniform
 # noinspection PyProtectedMember
 from scipy.stats._distn_infrastructure import rv_frozen
 
-
-class Variable(Protocol):
-    def value_of(
-        self, probability: Union[float, np.ndarray]
-    ) -> Union[float, np.ndarray]: ...
-
-    def get_finite_lower_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float: ...
-
-    def get_finite_upper_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float: ...
+from experiment_design.variable.types import Variable
 
 
 def is_frozen_discrete(dist: Any) -> bool:
@@ -81,12 +69,20 @@ class ContinuousVariable:
     def value_of(
         self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
+        """
+        Given a probability or an array of probabilities,
+        return the value using the inverse cdf of the distribution
+        """
         values = self.distribution.ppf(probability)
         if self.upper_bound is not None or self.lower_bound is not None:
             return np.clip(values, self.lower_bound, self.upper_bound)
         return values
 
     def cdf_of(self, value: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+        Given a value or an array of values,
+        return the probability using the cdf of the distribution
+        """
         return self.distribution.cdf(value)
 
     def get_finite_lower_bound(
@@ -133,10 +129,18 @@ class DiscreteVariable:
     def value_of(
         self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
+        """
+        Given a probability or an array of probabilities,
+        return the value using the inverse cdf of the distribution
+        """
         values = self.distribution.ppf(probability)
         return self.value_mapper(values)
 
     def cdf_of(self, values: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+        Given a value or an array of values,
+        return the probability using the cdf of the distribution
+        """
         return self.distribution.cdf(self.inverse_value_mapper(values))
 
     def get_finite_lower_bound(
@@ -187,30 +191,46 @@ class DesignSpace:
         return results
 
     def value_of(self, probabilities: np.ndarray) -> np.ndarray:
+        """
+        Given an array of probabilities, return the coordinates of the corresponding
+        point in the space using the inverse cdf of variable distributions
+        """
         return self._map_by("value_of", probabilities)
 
     def cdf_of(self, values: np.ndarray) -> np.ndarray:
+        """
+        Given an array of values, return the coordinates of the corresponding
+        marginal probabilities in the space using the cdf of variable distributions
+        """
         return self._map_by("cdf_of", values)
 
     @property
     def lower_bound(self) -> np.ndarray:
+        """Finite lower bound of the space"""
         return self._lower_bound
 
     @property
     def upper_bound(self) -> np.ndarray:
+        """Finite upper bound of the space"""
         return self._upper_bound
 
     @property
     def dimensions(self) -> int:
+        """Size of the space, i.e. the number of dimensions"""
         return len(self.variables)
 
     def __len__(self):
+        """Size of the space, i.e. the number of dimensions"""
         return self.dimensions
 
 
 def create_discrete_uniform_variables(
     discrete_sets: list[list[Union[int, float, str]]]
 ) -> list[DiscreteVariable]:
+    """
+    Given sets of possible values, create corresponding discrete variables
+    with equal probability of each value
+    """
     variables = []
     for discrete_set in discrete_sets:
         n_values = len(discrete_set)
@@ -238,8 +258,11 @@ def create_discrete_uniform_variables(
 
 
 def create_continuous_uniform_variables(
-    continuous_lower_bounds: list[float], continuous_upper_bounds: list[float]
-) -> list[Union[DiscreteVariable, ContinuousVariable]]:
+    continuous_lower_bounds: Iterable[float], continuous_upper_bounds: Iterable[float]
+) -> list[ContinuousVariable]:
+    """
+    Given lower and upper bounds, create uniform variables
+    """
     if len(continuous_lower_bounds) != len(continuous_upper_bounds):
         raise ValueError(
             "Number of lower bounds has to be equal to the number of upper bounds"
@@ -253,6 +276,12 @@ def create_continuous_uniform_variables(
 def create_variables_from_distributions(
     distributions: list[rv_frozen],
 ) -> list[Variable]:
+    """
+    Given a list of distributions, create the corresponding continuous or discrete variables
+
+    :param distributions: Frozen scipy distributions of the variables to be created
+    :return: List of created variables
+    """
     variables = []
     for dist in distributions:
         if is_frozen_discrete(dist):

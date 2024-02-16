@@ -11,8 +11,7 @@ from experiment_design.scorers import (
     make_corr_error_scorer,
     make_min_pairwise_distance_scorer,
 )
-from experiment_design.types import VariableCollection
-from experiment_design.variable import DesignSpace
+from experiment_design.variable import DesignSpace, VariableCollection
 
 DEFAULT_CORRELATION_SCORE_WEIGHT = 0.2
 

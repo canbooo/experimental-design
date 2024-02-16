@@ -3,12 +3,20 @@ from typing import Optional, Protocol, Union
 import numpy as np
 from scipy.spatial.distance import pdist
 
-from experiment_design.types import VariableCollection
 from experiment_design.variable import DesignSpace
+from experiment_design.variable.types import VariableCollection
 
 
 class Scorer(Protocol):
-    def __call__(self, doe: np.ndarray) -> float: ...
+    def __call__(self, doe: np.ndarray) -> float:
+        """
+        A scoring function to evaluate an experiment design quality. Larger values are better,
+        i.e. this will be maximized
+
+        :param doe: Design of experiments consisting of candidate samples
+        :return: score
+        """
+        ...
 
 
 def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-2) -> Scorer:

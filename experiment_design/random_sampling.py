@@ -6,8 +6,7 @@ from scipy.stats import uniform
 
 from experiment_design.optimize import get_best_try
 from experiment_design.scorers import Scorer, make_default_scorer
-from experiment_design.types import VariableCollection
-from experiment_design.variable import Variable, DesignSpace
+from experiment_design.variable import DesignSpace, Variable, VariableCollection
 
 
 def _create(variables: VariableCollection, sample_size: int) -> np.ndarray:
