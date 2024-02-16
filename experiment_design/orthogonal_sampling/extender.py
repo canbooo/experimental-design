@@ -134,7 +134,7 @@ class OrthogonalDesignExtender:
                 self.target_correlation, num_variables=len(variables)
             )
             scorer = make_default_local_scorer(
-                variables, old_sample, target_correlation
+                old_sample, variables, target_correlation
             )
 
         new_sample = get_best_try(
@@ -149,8 +149,8 @@ class OrthogonalDesignExtender:
 
 
 def make_default_local_scorer(
-    variables: DesignSpace,
     old_sample: np.ndarray,
+    variables: DesignSpace,
     target_correlation: np.ndarray,
     correlation_score_weight: float = 0.2,
 ) -> Scorer:
