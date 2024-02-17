@@ -35,18 +35,20 @@ class ExperimentDesigner(abc.ABC):
         old_sample: Optional[np.ndarray] = None,
         steps: Optional[int] = None,
         initial_optimization_proportion: float = DEFAULT_INITIAL_OPTIMIZATION_PROPORTION,
+        verbose: int = 0,
     ) -> np.ndarray:
         """
-        Create or extend a design of experiments (DoE)
+        Create or extend a design of experiments (DoE).
 
-        :param variables: Determines the dimensions of the resulting sample
-        :param sample_size: the number of points to be created
+        :param variables: Determines the dimensions of the resulting sample.
+        :param sample_size: the number of points to be created.
         :param old_sample: Old DoE matrix with shape (len(variables), old_sample_size). If provided,
             it will be extended with sample_size new points, otherwise a new DoE will be created.
             In both cases, only the new points will be returned.
-        :param steps: Number of DoEs to be created to choose the best from
+        :param steps: Number of DoEs to be created to choose the best from.
         :param initial_optimization_proportion:  Proportion of steps that will be used to create an
-            initial DoE with a good score. Rest of the steps will be used to optimize the candidate points
+            initial DoE with a good score. Rest of the steps will be used to optimize the candidate points.
+        :param verbose: Controls print messages. 2 leads to maximum verbosity,
         :return: DoE matrix with shape (len(variables), samples_size)
         """
         if not isinstance(variables, DesignSpace):
@@ -57,10 +59,16 @@ class ExperimentDesigner(abc.ABC):
         )
         if old_sample is None:
             return self._create(
-                variables, sample_size, scorer, initial_steps, final_steps
+                variables, sample_size, scorer, initial_steps, final_steps, verbose
             )
         return self._extend(
-            old_sample, variables, sample_size, scorer, initial_steps, final_steps
+            old_sample,
+            variables,
+            sample_size,
+            scorer,
+            initial_steps,
+            final_steps,
+            verbose,
         )
 
     @abc.abstractmethod
@@ -71,6 +79,7 @@ class ExperimentDesigner(abc.ABC):
         scorer: Scorer,
         initial_steps: int,
         final_steps: int,
+        verbose: int,
     ) -> np.ndarray:
         raise NotImplementedError
 
@@ -83,6 +92,7 @@ class ExperimentDesigner(abc.ABC):
         scorer: Scorer,
         initial_steps: int,
         final_steps: int,
+        verbose: int,
     ) -> np.ndarray:
         raise NotImplementedError
 

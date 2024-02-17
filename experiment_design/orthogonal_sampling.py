@@ -67,6 +67,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
         scorer: Scorer,
         initial_steps: int,
         final_steps: int,
+        verbose: int,
     ) -> np.ndarray:
         target_correlation = create_correlation_matrix(
             self.target_correlation, num_variables=variables.dimensions
@@ -80,18 +81,25 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
                 central_design=self.central_design,
             )
 
+        if verbose:
+            print("Creating an initial design")
         doe = random_search(
-            partial(
+            creator=partial(
                 create_orthogonal_design,
                 variables=variables,
                 sample_size=sample_size,
                 target_correlation=target_correlation,
                 central_design=self.central_design,
             ),
-            scorer,
-            initial_steps,
+            scorer=scorer,
+            steps=initial_steps,
+            verbose=verbose,
         )
-        return simulated_annealing_by_perturbation(doe, scorer, steps=final_steps)
+        if verbose:
+            print("Optimizing the initial design")
+        return simulated_annealing_by_perturbation(
+            doe, scorer, steps=final_steps, verbose=verbose
+        )
 
     def _extend(
         self,
@@ -101,6 +109,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
         scorer: Scorer,
         initial_steps: int,
         final_steps: int,
+        verbose: int,
     ) -> np.ndarray:
         probabilities = variables.cdf_of(select_local(old_sample, variables))
         if not np.all(np.isfinite(probabilities)):
@@ -113,19 +122,22 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
         empty = _find_sufficient_empty_bins(
             probabilities, bins_per_dimension, sample_size
         )
-
+        if verbose:
+            print("Creating candidate points to extend the design")
         new_sample = random_search(
-            partial(
+            creator=partial(
                 _create_candidates_from,
                 empty_bins=empty,
                 variables=variables,
                 sample_size=sample_size,
                 central_design=self.central_design,
             ),
-            scorer,
-            initial_steps,
+            scorer=scorer,
+            steps=initial_steps,
+            verbose=verbose,
         )
-
+        if verbose:
+            print("Optimizing candidate points to extend the design")
         return simulated_annealing_by_perturbation(
             new_sample, scorer, steps=final_steps
         )

@@ -19,10 +19,14 @@ class RandomSamplingDesigner(ExperimentDesigner):
         scorer: Scorer,
         initial_steps: int,
         final_steps: int,
+        verbose: int,
     ) -> np.ndarray:
         steps = initial_steps + final_steps
         return random_search(
-            partial(sample_from, variables, sample_size), scorer, steps
+            creator=partial(sample_from, variables, sample_size),
+            scorer=scorer,
+            steps=steps,
+            verbose=verbose,
         )
 
     def _extend(
@@ -33,10 +37,14 @@ class RandomSamplingDesigner(ExperimentDesigner):
         scorer: Scorer,
         initial_steps: int,
         final_steps: int,
+        verbose: int,
     ) -> np.ndarray:
         steps = initial_steps + final_steps
         return random_search(
-            partial(sample_from, variables, sample_size), scorer, steps
+            creator=partial(sample_from, variables, sample_size),
+            scorer=scorer,
+            steps=steps,
+            verbose=verbose,
         )
 
 
