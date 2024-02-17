@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, Union
+from typing import Callable, Iterable, Optional, Protocol, Union
 
 import numpy as np
 from scipy.spatial.distance import pdist
@@ -19,17 +19,12 @@ class Scorer(Protocol):
         ...
 
 
-class CreationScoreFactory(Protocol):
-    def __call__(self, variables: VariableCollection, sample_size: int) -> Scorer:
-        """
-        Given variables and sample size, create a scoring function
-        """
-        ...
-
-
-class ExtensionScoreFactory(Protocol):
+class ScorerFactory(Protocol):
     def __call__(
-        self, old_sample: np.ndarray, variables: VariableCollection, sample_size: int
+        self,
+        variables: VariableCollection,
+        sample_size: int,
+        old_sample: Optional[np.ndarray] = None,
     ) -> Scorer:
         """
         Given variables and sample size, create a scoring function
@@ -37,77 +32,191 @@ class ExtensionScoreFactory(Protocol):
         ...
 
 
-def make_corr_error_scorer(target_correlation: np.ndarray, eps: float = 1e-2) -> Scorer:
+class MaxCorrelationScorerFactory:
     """
-    Create a scorer, that computes the maximum absolute correlation error between the samples
-    and the target_correlation.
+    A scorer factory for the maximum absolute correlation error between sampling points.
 
     :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
     representing the linear dependency between the dimensions.
+    :param local: If True, any points in the old_sample will be ignored, that
+    fall outside the finite bounds of the provided variables. Has no effect if old_sample
+    is None.
     :param eps: a small positive value to improve the stability of the log operation
-    :return: a scorer that returns the negative log maximum absolute correlation error
+
     """
-    if np.max(np.abs(target_correlation)) > 1:
-        raise ValueError("Correlations should be in the interval [-1,1].")
 
-    def _scorer(doe: np.ndarray) -> float:
-        error = np.max(np.abs(np.corrcoef(doe, rowvar=False) - target_correlation))
-        return -np.log10(error + eps)
+    def __init__(
+        self,
+        target_correlation: Union[float, np.ndarray] = 0,
+        local: bool = True,
+        eps: float = 1e-2,
+    ) -> None:
+        if np.max(np.abs(target_correlation)) > 1:
+            raise ValueError("Correlations should be in the interval [-1,1].")
+        self.target_correlation = target_correlation
 
-    return _scorer
+        self.local = local
+
+        if eps < 0:
+            raise ValueError("eps must be positive")
+        self.eps = eps
+
+    def __call__(
+        self,
+        variables: VariableCollection,
+        sample_size: int,
+        old_sample: Optional[np.ndarray] = None,
+    ) -> Scorer:
+        """
+        Creates a scorer, that computes the maximum absolute correlation error between the candidate samples
+        and the target_correlation.
+
+        :param variables: Dimensions of the design space
+        :param sample_size: number of candidate points to be scored
+        :param old_sample: If passed, represents the matrix of points in an older design of experiments with shape
+        (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
+        candidate points before computing the correlation error
+        :return: a scorer that returns the negative log maximum absolute correlation error
+        """
+
+        target_correlation = create_correlation_matrix(
+            self.target_correlation, num_variables=len(variables)
+        )
+        handler = create_old_doe_handler(variables, old_sample, local=self.local)
+
+        def _scorer(doe: np.ndarray) -> float:
+            error = np.max(
+                np.abs(np.corrcoef(handler(doe), rowvar=False) - target_correlation)
+            )
+            return -np.log10(error + self.eps)
+
+        return _scorer
 
 
-def make_min_pairwise_distance_scorer(max_distance: float = 1.0) -> Scorer:
+class PairwiseDistanceScorerFactory:
     """
-    Create a scorer, that computes the minimum pairwise distance between the samples.
-    :param max_distance: Used for scaling the log
+    A scorer factory for the minimum pairwise distance between sampling points.
+
+    Note: This currently computes all distances. Hence, it may be inefficient for very large
+    sample sizes. This behaviour could be improved using algorithms like KDTrees or KNN but
+    they would lead to more dependencies. Therefore, we prefer omitting the implementation for
+    now and providing this note instead. If there is interest in handling large sample sizes,
+    create an issue or open a pull request.
+
+    :param local: If True, any points in the old_sample will be ignored, that
+    fall outside the finite bounds of the provided variables. Has no effect if old_sample
+    is None.
     :return: a scorer that returns the log minimum pairwise distance divided by the log max distance
     """
-    max_log_distance = np.log10(max_distance)
 
-    def _scorer(doe: np.ndarray) -> float:
-        min_pairwise_distance = np.log10(np.min(pdist(doe)))
-        return min_pairwise_distance - max_log_distance
+    def __init__(self, local: bool = False) -> None:
+        self.local = local
 
-    return _scorer
+    def __call__(
+        self,
+        variables: VariableCollection,
+        sample_size: int,
+        old_sample: Optional[np.ndarray] = None,
+    ) -> Scorer:
+        """
+        Create a scorer, that computes the minimum pairwise distance between sampling points.s
+
+        :param variables: Dimensions of the design space
+        :param sample_size: number of candidate points to be scored
+        :param old_sample: If passed, represents the matrix of points in an older design of experiments with shape
+        (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
+        candidate points before computing the correlation error
+        :return: a scorer that returns the log minimum pairwise distance divided by the log max distance
+        """
+
+        handler = create_old_doe_handler(variables, old_sample, local=self.local)
+        max_log_distance = np.log10(calculate_max_space_distance(variables))
+
+        def _scorer(doe: np.ndarray) -> float:
+            min_pairwise_distance = np.log10(np.min(pdist(handler(doe))))
+            return min_pairwise_distance - max_log_distance
+
+        return _scorer
 
 
-def make_default_scorer(
-    variables: VariableCollection,
-    target_correlation: Union[np.ndarray, float] = 0.0,
-    correlation_score_weight: float = 0.2,
-):
+class WeightedSumScorerFactory:
     """
-    Create a default scorer, which creates a scorer from the sum of minimum
-    pairwise distance and maximum correlation error scorers. See those scorers
-    for more details.
+    A factory that creates a weighted sum of multiple scorers
+
+    :param scorer_factories: These are combined by adding the scores their scorers provide
+    :param weights: Weights to use for combining the scorers. If not passed, each scores
+    will not be weighted.
+    """
+
+    def __init__(
+        self, scorer_factories: list[ScorerFactory], weights: Iterable[float]
+    ) -> None:
+        self.scorer_factories = scorer_factories
+        if weights is None:
+            weights = np.ones(len(scorer_factories))
+        self.weights = np.array(weights).ravel()
+        if self.weights.size != self.scorer_factories:
+            raise ValueError(
+                f"Wrong number of scorer_factories ({len(scorer_factories)}) and weights ({weights.size})"
+            )
+
+    def __call__(
+        self,
+        variables: VariableCollection,
+        sample_size: int,
+        old_sample: Optional[np.ndarray] = None,
+    ) -> Scorer:
+
+        scorers = [
+            factory(variables, sample_size, old_sample=old_sample)
+            for factory in self.scorer_factories
+        ]
+
+        def _scorer(doe: np.ndarray) -> float:
+            return sum(
+                [scorer(doe) * weight for scorer, weight in zip(scorers, self.weights)]
+            )
+
+        return _scorer
 
 
-    :param variables: variables of the doe. Used to determine the dimension number and
-    bounds of the space
+def create_default_scorer_factory(
+    target_correlation: Union[np.ndarray, float] = 0.0,
+    distance_score_weight: float = 0.85,
+    correlation_score_weight: float = 0.15,
+    local_correlation: bool = True,
+    local_pairwise_distance: bool = False,
+) -> ScorerFactory:
+    """
+    Create a scorer factory, which is a weighted sum of maximum correlation error and
+    minimum pairwise distance scorers
     :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
     representing the linear dependency between the dimensions. If a float, all non-diagonal entries
     of the unit matrix will be set to this value.
-    :param correlation_score_weight: Weight factor used for the max correlation error score.
-    :return: scorer as a sum of the minimum pairwise distance and maximum correlation error scorers.
+    :param distance_score_weight: Weight of the minimum pairwise distance score
+    :param correlation_score_weight: Weight of the maximum correlation error score
+    :param local_correlation: Controls the local attribute of the MaxCorrelationScorerFactory
+    :param local_pairwise_distance: Controls the local attribute of the PairwiseDistanceScorerFactory
+    :return: WeightedSumScorerFactory instance
     """
+    corr_scorer_factory = MaxCorrelationScorerFactory(
+        target_correlation=target_correlation, local=local_correlation
+    )
+    dist_scorer_factory = PairwiseDistanceScorerFactory(local=local_pairwise_distance)
+    return WeightedSumScorerFactory(
+        scorer_factories=[corr_scorer_factory, dist_scorer_factory],
+        weights=[correlation_score_weight, distance_score_weight],
+    )
+
+
+def calculate_max_space_distance(variables: VariableCollection) -> float:
     if not isinstance(variables, DesignSpace):
         variables = DesignSpace(variables)
-    max_distance = get_max_distance(variables)
-    dist_scorer = make_min_pairwise_distance_scorer(max_distance)
-    target_correlation = get_correlation_matrix(
-        target_correlation=target_correlation, num_variables=variables.dimensions
-    )
-    corr_scorer = make_corr_error_scorer(target_correlation)
-    return lambda doe: dist_scorer(doe) + correlation_score_weight * corr_scorer(doe)
-
-
-def get_max_distance(space: DesignSpace) -> float:
-    lower, upper = space.lower_bound, space.upper_bound
+    lower, upper = variables.lower_bound, variables.upper_bound
     return np.linalg.norm(np.array(upper) - np.array(lower))
 
 
-def get_correlation_matrix(
+def create_correlation_matrix(
     target_correlation: Union[np.ndarray, float] = 0.0,
     num_variables: Optional[int] = None,
 ) -> np.ndarray:
@@ -123,26 +232,37 @@ def get_correlation_matrix(
     )
 
 
-def make_default_local_scorer(
-    old_sample: np.ndarray,
-    variables: DesignSpace,
-    target_correlation: np.ndarray,
-    correlation_score_weight: float = 0.2,
-) -> Scorer:
+def create_old_doe_handler(
+    variables: VariableCollection,
+    old_sample: Optional[np.ndarray] = None,
+    local: bool = False,
+) -> Callable[[np.ndarray], np.ndarray]:
+    """
+    Return a function to handle any old design of experiments. Specifically,
+    append some or all of the points from an old design of experiments (DoE) for
+    including them in the scoring.
+
+    :param variables: Dimensions of the design space. Only relevant if local is set to True
+    :param old_sample: Matrix of points with shape=(sample_size, len(variables)) in the old
+    DoE. If None, this returns a no-op function
+    :param local: If True, only include the points from the old_doe, that fall between the
+    finit local bounds of the variables
+    :return: The function with a single argument, new doe, which may append points from the
+    old doe depending on the arguments provided.
+    """
+    if old_sample is None:
+        # Nothing to handle
+        return lambda x: x
+
+    if not local:
+        # Append every point in the old doe
+        return lambda x: np.append(old_sample, x, axis=0)
+
+    if not isinstance(variables, DesignSpace):
+        variables = DesignSpace(variables)
     lower, upper = variables.lower_bound[None, :], variables.upper_bound[None, :]
     local_mask = np.logical_and(
         (old_sample >= lower).all(1), (old_sample <= upper).all(1)
     )
-
-    corr_scorer = make_corr_error_scorer(target_correlation)
-    lower = np.minimum(lower, old_sample.min(0))
-    upper = np.minimum(upper, old_sample.max(0))
-    max_distance = np.linalg.norm(upper - lower)
-    dist_scorer = make_min_pairwise_distance_scorer(max_distance)
-
-    def _scorer(doe: np.ndarray) -> float:
-        dist_score = dist_scorer(np.append(old_sample, doe, axis=0))
-        corr_score = corr_scorer(np.append(old_sample[local_mask], doe, axis=0))
-        return dist_score + correlation_score_weight * corr_score
-
-    return _scorer
+    old_sample = old_sample[local_mask]
+    return lambda x: np.append(old_sample, x, axis=0)

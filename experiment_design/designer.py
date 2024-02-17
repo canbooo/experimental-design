@@ -4,9 +4,9 @@ from typing import Optional
 import numpy as np
 
 from experiment_design.scorers import (
-    CreationScoreFactory,
-    ExtensionScoreFactory,
     Scorer,
+    ScorerFactory,
+    create_default_scorer_factory,
 )
 from experiment_design.variable import DesignSpace, VariableCollection
 
@@ -17,12 +17,12 @@ class Designer(abc.ABC):
 
     def __init__(
         self,
-        creation_score_factory: CreationScoreFactory,
-        extension_score_factory: ExtensionScoreFactory,
+        score_factory: Optional[ScorerFactory] = None,
         initial_optimization_proportion: float = INITIAL_OPTIMIZATION_PROPORTION,
     ):
-        self.creation_score_factory = creation_score_factory
-        self.extension_score_factory = extension_score_factory
+        if score_factory is None:
+            score_factory = create_default_scorer_factory()
+        self.score_factory = score_factory
         self.initial_optimization_proportion = initial_optimization_proportion
 
     def create(
@@ -41,7 +41,7 @@ class Designer(abc.ABC):
         """
         if not isinstance(variables, DesignSpace):
             variables = DesignSpace(variables)
-        scorer = self.creation_score_factory(variables, sample_size)
+        scorer = self.score_factory(variables, sample_size)
         initial_steps, final_steps = get_init_opt_steps(
             sample_size, steps, proportion=self.initial_optimization_proportion
         )
@@ -68,7 +68,7 @@ class Designer(abc.ABC):
         """
         if not isinstance(variables, DesignSpace):
             variables = DesignSpace(variables)
-        scorer = self.extension_score_factory(old_sample, variables, sample_size)
+        scorer = self.score_factory(variables, sample_size, old_sample=old_sample)
         initial_steps, final_steps = get_init_opt_steps(
             sample_size, steps, proportion=self.initial_optimization_proportion
         )
