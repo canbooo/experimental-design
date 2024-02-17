@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, Protocol, Union
+from typing import Any, Callable, Iterable, Optional, Protocol, Sequence, Union
 
 import numpy as np
 from scipy.stats import randint, rv_continuous, rv_discrete, uniform
@@ -10,17 +10,19 @@ from scipy.stats._distn_infrastructure import rv_frozen
 
 
 def is_frozen_discrete(dist: Any) -> bool:
+    """Check if dist is a rv_frozen_discrete instance"""
     return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_discrete)
 
 
 def is_frozen_continuous(dist: Any) -> bool:
+    """Check if dist is a rv_frozen_continuous instance"""
     return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_continuous)
 
 
-def change_field_representation(
+def _change_field_representation(
     dataclass_instance: dataclass, representations_to_change: dict[str, Any]
 ) -> str:
-    """Just like the default __repr__ but supports reformatting some values."""
+    """Just like the default __repr__ but supports reformatting and replacing some values."""
     final = []
     for current_field in dataclass_instance.__dataclass_fields__.values():
         if not current_field.repr:
@@ -33,7 +35,8 @@ def change_field_representation(
     return f"{dataclass_instance.__class__.__name__}({', '.join(final)})"
 
 
-def create_distribution_representation(distribution: rv_frozen) -> str:
+def _create_distribution_representation(distribution: rv_frozen) -> str:
+    """Create a readable representation of rv_frozen instances"""
     args = ", ".join([str(a) for a in distribution.args])
     kwargs = ", ".join([f"{k}={v}" for k, v in distribution.kwds])
     params = [a for a in [args, kwargs] if a]
@@ -42,6 +45,8 @@ def create_distribution_representation(distribution: rv_frozen) -> str:
 
 @dataclass
 class ContinuousVariable:
+    """A variable with continuous distribution"""
+
     distribution: Optional[rv_frozen] = None
     lower_bound: Optional[float] = None
     upper_bound: Optional[float] = None
@@ -67,20 +72,14 @@ class ContinuousVariable:
     def value_of(
         self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
-        """
-        Given a probability or an array of probabilities,
-        return the value using the inverse cdf of the distribution
-        """
+        """Given a probability or an array of probabilities return the corresponding value(s) using the inverse cdf."""
         values = self.distribution.ppf(probability)
         if self.upper_bound is not None or self.lower_bound is not None:
             return np.clip(values, self.lower_bound, self.upper_bound)
         return values
 
     def cdf_of(self, value: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Given a value or an array of values,
-        return the probability using the cdf of the distribution
-        """
+        """Given a value or an array of values return the probability using the cdf."""
         return self.distribution.cdf(value)
 
     def get_finite_lower_bound(
@@ -104,16 +103,18 @@ class ContinuousVariable:
         return self.value_of(1 - infinite_support_probability_tolerance)
 
     def __repr__(self) -> str:
-        distribution_representation = create_distribution_representation(
+        distribution_representation = _create_distribution_representation(
             self.distribution
         )
-        return change_field_representation(
+        return _change_field_representation(
             self, {"distribution": distribution_representation}
         )
 
 
 @dataclass
 class DiscreteVariable:
+    """A variable with discrete distribution"""
+
     distribution: rv_frozen
     value_mapper: Callable[[float], Union[float, int]] = lambda x: x
     inverse_value_mapper: Callable[[float, int], Union[float]] = lambda x: x
@@ -127,18 +128,12 @@ class DiscreteVariable:
     def value_of(
         self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
-        """
-        Given a probability or an array of probabilities,
-        return the value using the inverse cdf of the distribution
-        """
+        """Given a probability or an array of probabilities return the corresponding value(s) using the inverse cdf."""
         values = self.distribution.ppf(probability)
         return self.value_mapper(values)
 
     def cdf_of(self, values: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Given a value or an array of values,
-        return the probability using the cdf of the distribution
-        """
+        """Given a value or an array of values return the probability using the cdf."""
         return self.distribution.cdf(self.inverse_value_mapper(values))
 
     def get_finite_lower_bound(
@@ -158,10 +153,10 @@ class DiscreteVariable:
         return self.value_of(1 - infinite_support_probability_tolerance)
 
     def __repr__(self) -> str:
-        distribution_representation = create_distribution_representation(
+        distribution_representation = _create_distribution_representation(
             self.distribution
         )
-        return change_field_representation(
+        return _change_field_representation(
             self, {"distribution": distribution_representation}
         )
 
@@ -169,10 +164,7 @@ class DiscreteVariable:
 def create_discrete_uniform_variables(
     discrete_sets: list[list[Union[int, float, str]]]
 ) -> list[DiscreteVariable]:
-    """
-    Given sets of possible values, create corresponding discrete variables
-    with equal probability of each value
-    """
+    """Given sets of possible values, create corresponding discrete variables with equal probability of each value."""
     variables = []
     for discrete_set in discrete_sets:
         n_values = len(discrete_set)
@@ -200,11 +192,9 @@ def create_discrete_uniform_variables(
 
 
 def create_continuous_uniform_variables(
-    continuous_lower_bounds: Iterable[float], continuous_upper_bounds: Iterable[float]
+    continuous_lower_bounds: Sequence[float], continuous_upper_bounds: Sequence[float]
 ) -> list[ContinuousVariable]:
-    """
-    Given lower and upper bounds, create uniform variables
-    """
+    """Given lower and upper bounds, create uniform variables."""
     if len(continuous_lower_bounds) != len(continuous_upper_bounds):
         raise ValueError(
             "Number of lower bounds has to be equal to the number of upper bounds"
@@ -219,16 +209,10 @@ class Variable(Protocol):
     def value_of(
         self, probability: Union[float, np.ndarray]
     ) -> Union[float, np.ndarray]:
-        """
-        Given a probability or an array of probabilities,
-        return the value using the inverse cdf of the distribution
-        """
+        """Given a probability or an array of probabilities return the corresponding value(s) using the inverse cdf."""
 
     def cdf_of(self, value: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Given a value or an array of values,
-        return the probability using the cdf of the distribution
-        """
+        """Given a value or an array of values return the probability using the cdf."""
 
     def get_finite_lower_bound(self) -> float:
         """
@@ -248,12 +232,7 @@ class Variable(Protocol):
 def create_variables_from_distributions(
     distributions: list[rv_frozen],
 ) -> list[Variable]:
-    """
-    Given a list of distributions, create the corresponding continuous or discrete variables
-
-    :param distributions: Frozen scipy distributions of the variables to be created
-    :return: List of created variables
-    """
+    """Given a list of distributions, create the corresponding continuous or discrete variables."""
     variables = []
     for dist in distributions:
         if is_frozen_discrete(dist):
