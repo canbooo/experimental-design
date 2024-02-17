@@ -11,10 +11,10 @@ class Scorer(Protocol):
     def __call__(self, doe: np.ndarray) -> float:
         """
         A scoring function to evaluate an experiment design quality. Larger values are better,
-        i.e. this will be maximized
+        i.e. this will be maximized.
 
-        :param doe: Design of experiments consisting of candidate samples
-        :return: score
+        :param doe: Design of experiments consisting of candidate samples.
+        :return: score of the DoE.
         """
         ...
 
@@ -26,9 +26,7 @@ class ScorerFactory(Protocol):
         sample_size: int,
         old_sample: Optional[np.ndarray] = None,
     ) -> Scorer:
-        """
-        Given variables and sample size, create a scoring function
-        """
+        """Given variables and sample size, create a scoring function"""
         ...
 
 
@@ -36,12 +34,11 @@ class MaxCorrelationScorerFactory:
     """
     A scorer factory for the maximum absolute correlation error between sampling points.
 
-    :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
-    representing the linear dependency between the dimensions.
-    :param local: If True, any points in the old_sample will be ignored, that
-    fall outside the finite bounds of the provided variables. Has no effect if old_sample
-    is None.
-    :param eps: a small positive value to improve the stability of the log operation
+    :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)), representing the linear
+        dependency between the dimensions.
+    :param local: If True, any points in the old_sample will be ignored, that fall outside the finite bounds of the
+        provided variables. Has no effect if old_sample is None.
+    :param eps: a small positive value to improve the stability of the log operation.
 
     """
 
@@ -71,12 +68,12 @@ class MaxCorrelationScorerFactory:
         Creates a scorer, that computes the maximum absolute correlation error between the candidate samples
         and the target_correlation.
 
-        :param variables: Dimensions of the design space
-        :param sample_size: number of candidate points to be scored
+        :param variables: Dimensions of the design space.
+        :param sample_size: number of candidate points to be scored.
         :param old_sample: If passed, represents the matrix of points in an older design of experiments with shape
-        (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
-        candidate points before computing the correlation error
-        :return: a scorer that returns the negative log maximum absolute correlation error
+            (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
+            candidate points before computing the correlation error.
+        :return: a scorer that returns the negative log maximum absolute correlation error.
         """
 
         target_correlation = create_correlation_matrix(
@@ -103,10 +100,9 @@ class PairwiseDistanceScorerFactory:
     now and providing this note instead. If there is interest in handling large sample sizes,
     create an issue or open a pull request.
 
-    :param local: If True, any points in the old_sample will be ignored, that
-    fall outside the finite bounds of the provided variables. Has no effect if old_sample
-    is None.
-    :return: a scorer that returns the log minimum pairwise distance divided by the log max distance
+    :param local: If True, any points in the old_sample will be ignored, that fall outside the finite bounds of the
+        provided variables. Has no effect if old_sample is None.
+    :return: a scorer that returns the log minimum pairwise distance divided by the log max distance.
     """
 
     def __init__(self, local: bool = False) -> None:
@@ -121,12 +117,12 @@ class PairwiseDistanceScorerFactory:
         """
         Create a scorer, that computes the minimum pairwise distance between sampling points.s
 
-        :param variables: Dimensions of the design space
-        :param sample_size: number of candidate points to be scored
+        :param variables: Dimensions of the design space.
+        :param sample_size: number of candidate points to be scored.
         :param old_sample: If passed, represents the matrix of points in an older design of experiments with shape
-        (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
-        candidate points before computing the correlation error
-        :return: a scorer that returns the log minimum pairwise distance divided by the log max distance
+            (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
+            candidate points before computing the correlation error.
+        :return: a scorer that returns the log minimum pairwise distance divided by the log max distance,
         """
 
         handler = create_old_doe_handler(variables, old_sample, local=self.local)
@@ -143,9 +139,8 @@ class WeightedSumScorerFactory:
     """
     A factory that creates a weighted sum of multiple scorers
 
-    :param scorer_factories: These are combined by adding the scores their scorers provide
-    :param weights: Weights to use for combining the scorers. If not passed, each scores
-    will not be weighted.
+    :param scorer_factories: These are combined by adding the scores their scorers provide.
+    :param weights: Weights to use for combining the scorers. If not passed, each scores will not be weighed.
     """
 
     def __init__(
@@ -190,14 +185,15 @@ def create_default_scorer_factory(
     """
     Create a scorer factory, which is a weighted sum of maximum correlation error and
     minimum pairwise distance scorers
-    :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)),
-    representing the linear dependency between the dimensions. If a float, all non-diagonal entries
-    of the unit matrix will be set to this value.
-    :param distance_score_weight: Weight of the minimum pairwise distance score
-    :param correlation_score_weight: Weight of the maximum correlation error score
-    :param local_correlation: Controls the local attribute of the MaxCorrelationScorerFactory
+
+    :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)), representing the linear
+        dependency between the dimensions. If a float, all non-diagonal entries of the unit matrix will be set to this
+        value.
+    :param distance_score_weight: Weight of the minimum pairwise distance score.
+    :param correlation_score_weight: Weight of the maximum correlation error score.
+    :param local_correlation: Controls the local attribute of the MaxCorrelationScorerFactory.
     :param local_pairwise_distance: Controls the local attribute of the PairwiseDistanceScorerFactory
-    :return: WeightedSumScorerFactory instance
+    :return: WeightedSumScorerFactory instance.
     """
     corr_scorer_factory = MaxCorrelationScorerFactory(
         target_correlation=target_correlation, local=local_correlation
@@ -210,6 +206,7 @@ def create_default_scorer_factory(
 
 
 def calculate_max_space_distance(variables: VariableCollection) -> float:
+    """Calculate the length of the diagonal of the (Euclidean) design space"""
     if not isinstance(variables, DesignSpace):
         variables = DesignSpace(variables)
     lower, upper = variables.lower_bound, variables.upper_bound
@@ -220,6 +217,7 @@ def create_correlation_matrix(
     target_correlation: Union[np.ndarray, float] = 0.0,
     num_variables: Optional[int] = None,
 ) -> np.ndarray:
+    """Create a correlation matrix from the target correlation in case it is a float"""
     if not np.isscalar(target_correlation):
         return target_correlation
     if not num_variables:
@@ -242,13 +240,13 @@ def create_old_doe_handler(
     append some or all of the points from an old design of experiments (DoE) for
     including them in the scoring.
 
-    :param variables: Dimensions of the design space. Only relevant if local is set to True
-    :param old_sample: Matrix of points with shape=(sample_size, len(variables)) in the old
-    DoE. If None, this returns a no-op function
-    :param local: If True, only include the points from the old_doe, that fall between the
-    finit local bounds of the variables
-    :return: The function with a single argument, new doe, which may append points from the
-    old doe depending on the arguments provided.
+    :param variables: Dimensions of the design space. Only relevant if local is set to True.
+    :param old_sample: Matrix of points with shape=(sample_size, len(variables)) in the old DoE. If None, this returns
+        a no-op function.
+    :param local: If True, only include the points from the old_doe, that fall between the finite local bounds of the
+        variables.
+    :return: The function with a single argument, new doe, which may append points from the old doe depending on the
+        arguments provided.
     """
     if old_sample is None:
         # Nothing to handle
