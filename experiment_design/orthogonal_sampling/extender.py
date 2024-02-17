@@ -9,6 +9,7 @@ from experiment_design.scorers import (
     Scorer,
     get_correlation_matrix,
     make_corr_error_scorer,
+    make_default_local_scorer,
     make_min_pairwise_distance_scorer,
 )
 from experiment_design.variable import DesignSpace, VariableCollection
@@ -146,31 +147,6 @@ class OrthogonalDesignExtender:
         return simulated_annealing_by_perturbation(
             new_sample, scorer, steps=opt_steps, verbose=self.verbose
         )
-
-
-def make_default_local_scorer(
-    old_sample: np.ndarray,
-    variables: DesignSpace,
-    target_correlation: np.ndarray,
-    correlation_score_weight: float = 0.2,
-) -> Scorer:
-    lower, upper = variables.lower_bound[None, :], variables.upper_bound[None, :]
-    local_mask = np.logical_and(
-        (old_sample >= lower).all(1), (old_sample <= upper).all(1)
-    )
-
-    corr_scorer = make_corr_error_scorer(target_correlation)
-    lower = np.minimum(lower, old_sample.min(0))
-    upper = np.minimum(upper, old_sample.max(0))
-    max_distance = np.linalg.norm(upper - lower)
-    dist_scorer = make_min_pairwise_distance_scorer(max_distance)
-
-    def _scorer(doe: np.ndarray) -> float:
-        dist_score = dist_scorer(np.append(old_sample, doe, axis=0))
-        corr_score = corr_scorer(np.append(old_sample[local_mask], doe, axis=0))
-        return dist_score + correlation_score_weight * corr_score
-
-    return _scorer
 
 
 if __name__ == "__main__":
