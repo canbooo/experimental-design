@@ -150,9 +150,9 @@ class WeightedSumScorerFactory:
         if weights is None:
             weights = np.ones(len(scorer_factories))
         self.weights = np.array(weights).ravel()
-        if self.weights.size != self.scorer_factories:
+        if self.weights.size != len(self.scorer_factories):
             raise ValueError(
-                f"Wrong number of scorer_factories ({len(scorer_factories)}) and weights ({weights.size})"
+                f"Wrong number of scorer_factories ({len(scorer_factories)}) and weights ({self.weights.size})"
             )
 
     def __call__(

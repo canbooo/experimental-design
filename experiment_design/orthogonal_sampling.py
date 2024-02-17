@@ -101,6 +101,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
                 _create_candidates_from,
                 empty_bins=empty,
                 variables=variables,
+                sample_size=sample_size,
                 central_design=self.central_design,
             ),
             scorer,
@@ -217,23 +218,26 @@ def _find_empty_bins(probabilities: np.ndarray, bins_per_dimension: int) -> np.n
 
 
 def _create_candidates_from(
-    empty_bins: np.ndarray, variables: DesignSpace, central_design: bool = False
+    empty_bins: np.ndarray,
+    variables: DesignSpace,
+    sample_size: int,
+    central_design: bool = False,
 ) -> np.ndarray:
     empty_rows, empty_cols = np.where(empty_bins)
     bins_per_dimension, dimensions = empty_bins.shape
     delta = 1 / bins_per_dimension
-    probabilities = np.empty((empty_rows, dimensions))
+    probabilities = np.empty((sample_size, dimensions))
     for i_dim in range(dimensions):
         values = empty_rows[empty_cols == i_dim]
         np.random.shuffle(values)
-        diff = empty_rows - values.size
+        diff = sample_size - values.size
         if diff < 0:
-            values = values[:empty_rows]
+            values = values[:sample_size]
         elif diff > 0:
             available = [idx for idx in range(bins_per_dimension) if idx not in values]
             extra = np.random.choice(available, diff, replace=False)
             values = np.append(extra, values)
         probabilities[:, i_dim] = values * delta + delta / 2
     if not central_design:
-        probabilities += uniform(-delta / 2, delta).rvs(size=(empty_rows, dimensions))
+        probabilities += uniform(-delta / 2, delta).rvs(size=(sample_size, dimensions))
     return variables.value_of(probabilities)
