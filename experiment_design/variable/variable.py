@@ -50,6 +50,7 @@ class ContinuousVariable:
     distribution: Optional[rv_frozen] = None
     lower_bound: Optional[float] = None
     upper_bound: Optional[float] = None
+    infinite_bound_probability_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
         if self.distribution is None and None in [self.lower_bound, self.upper_bound]:
@@ -82,25 +83,25 @@ class ContinuousVariable:
         """Given a value or an array of values return the probability using the cdf."""
         return self.distribution.cdf(value)
 
-    def get_finite_lower_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
+    @property
+    def finite_lower_bound(self) -> float:
+        """Provide a finite lower bound of the variable even if it was not provided by the user."""
         if self.lower_bound is not None:
             return self.lower_bound
         value = self.value_of(0.0)
         if np.isfinite(value):
             return value
-        return self.value_of(infinite_support_probability_tolerance)
+        return self.value_of(self.infinite_bound_probability_tolerance)
 
-    def get_finite_upper_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
-    ):
+    @property
+    def finite_upper_bound(self) -> float:
+        """Provide a finite upper bound of the variable even if it was not provided by the user."""
         if self.upper_bound is not None:
             return self.upper_bound
         value = self.value_of(1.0)
         if np.isfinite(value):
             return value
-        return self.value_of(1 - infinite_support_probability_tolerance)
+        return self.value_of(1 - self.infinite_bound_probability_tolerance)
 
     def __repr__(self) -> str:
         distribution_representation = _create_distribution_representation(
@@ -118,6 +119,7 @@ class DiscreteVariable:
     distribution: rv_frozen
     value_mapper: Callable[[float], Union[float, int]] = lambda x: x
     inverse_value_mapper: Callable[[float, int], Union[float]] = lambda x: x
+    infinite_bound_probability_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
         if not is_frozen_discrete(self.distribution):
@@ -136,21 +138,21 @@ class DiscreteVariable:
         """Given a value or an array of values return the probability using the cdf."""
         return self.distribution.cdf(self.inverse_value_mapper(values))
 
-    def get_finite_lower_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
+    @property
+    def finite_lower_bound(self) -> float:
+        """Provide a finite lower bound of the variable even if it was not provided by the user."""
         support = self.distribution.support()
         if np.isfinite(support[0]):
             return self.value_mapper(support[0])
-        return self.value_of(infinite_support_probability_tolerance)
+        return self.value_of(self.infinite_bound_probability_tolerance)
 
-    def get_finite_upper_bound(
-        self, infinite_support_probability_tolerance: float = 1e-6
-    ) -> float:
+    @property
+    def finite_upper_bound(self) -> float:
+        """Provide a finite upper bound of the variable even if it was not provided by the user."""
         support = self.distribution.support()
-        if np.isfinite(support[1]):
+        if np.isfinite(support[-1]):
             return self.value_mapper(support[1])
-        return self.value_of(1 - infinite_support_probability_tolerance)
+        return self.value_of(1 - self.infinite_bound_probability_tolerance)
 
     def __repr__(self) -> str:
         distribution_representation = _create_distribution_representation(
@@ -214,19 +216,13 @@ class Variable(Protocol):
     def cdf_of(self, value: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         """Given a value or an array of values return the probability using the cdf."""
 
-    def get_finite_lower_bound(self) -> float:
-        """
-        Return a lower bound to be used for the experiment design.
-        If the user passed a lower bound or the variable distribution has a finite one,
-        it will be returned. Otherwise, return an appropriate finite value.
-        """
+    @property
+    def finite_lower_bound(self) -> float:
+        """Provide a finite upper bound of the variable even if it was not provided by the user."""
 
-    def get_finite_upper_bound(self) -> float:
-        """
-        Return an upper bound to be used for the experiment design.
-        If the user passed an upper bound or the variable distribution has a finite one,
-        it will be returned. Otherwise, return an appropriate finite value.
-        """
+    @property
+    def finite_upper_bound(self) -> float:
+        """Provide a finite upper bound of the variable even if it was not provided by the user."""
 
 
 def create_variables_from_distributions(
