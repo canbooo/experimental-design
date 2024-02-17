@@ -30,7 +30,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
         dependency between the dimensions. If a float, all non-diagonal entries of the unit matrix will be set to this
         value.
     :param central_design: If True, samples are placed exactly at the middle of each bin. Otherwise, they are placed
-        randomly between the 25% and 75% of the bin bounds.
+        randomly between the bin bounds.
     :param non_occupied_bins: Only relevant for extending the design, i.e. if old points are provided, and if the constraint
         regarding the number of occupation of each bin has to be violated. True means that each bin is occupied at least
         once for each dimension, although some bins might be occupied more often. Otherwise, each bin is occupied once
