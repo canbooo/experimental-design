@@ -9,12 +9,12 @@ from scipy.stats import randint, rv_continuous, rv_discrete, uniform
 from scipy.stats._distn_infrastructure import rv_frozen
 
 
-def is_frozen_discrete(dist: Any) -> bool:
+def _is_frozen_discrete(dist: Any) -> bool:
     """Check if dist is a rv_frozen_discrete instance"""
     return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_discrete)
 
 
-def is_frozen_continuous(dist: Any) -> bool:
+def _is_frozen_continuous(dist: Any) -> bool:
     """Check if dist is a rv_frozen_continuous instance"""
     return isinstance(dist, rv_frozen) and isinstance(dist.dist, rv_continuous)
 
@@ -67,7 +67,7 @@ class ContinuousVariable:
             and self.lower_bound >= self.upper_bound
         ):
             raise ValueError("lower_bound has to be smaller than upper_bound")
-        if not is_frozen_continuous(self.distribution):
+        if not _is_frozen_continuous(self.distribution):
             raise ValueError("Only frozen continuous distributions are supported.")
 
     def value_of(
@@ -122,7 +122,7 @@ class DiscreteVariable:
     infinite_bound_probability_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
-        if not is_frozen_discrete(self.distribution):
+        if not _is_frozen_discrete(self.distribution):
             raise ValueError("Only frozen discrete distributions are supported.")
         self.value_mapper = np.vectorize(self.value_mapper)
         self.inverse_value_mapper = np.vectorize(self.inverse_value_mapper)
@@ -231,9 +231,9 @@ def create_variables_from_distributions(
     """Given a list of distributions, create the corresponding continuous or discrete variables."""
     variables = []
     for dist in distributions:
-        if is_frozen_discrete(dist):
+        if _is_frozen_discrete(dist):
             variables.append(DiscreteVariable(distribution=dist))
-        elif is_frozen_continuous(dist):
+        elif _is_frozen_continuous(dist):
             variables.append(ContinuousVariable(distribution=dist))
         else:
             raise ValueError(
