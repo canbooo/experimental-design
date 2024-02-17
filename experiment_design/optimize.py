@@ -9,9 +9,18 @@ from scipy.special import comb as combine
 from experiment_design.scorers import Scorer
 
 
-def get_best_try(
+def random_search(
     creator: Callable[[], np.ndarray], scorer: Scorer, steps: int
 ) -> np.ndarray:
+    """
+    Given a design of experiment (DoE) creator and scorer, maximize the score
+    by random search.
+
+    :param creator: A function that creates DoEs.
+    :param scorer: A function that scores DoEs.
+    :param steps: Number of steps to search.
+    :return: The DoE matrix with the best score.
+    """
     steps = max(1, steps)
     best_score, best_doe = -np.inf, None
     for _ in range(steps):
@@ -23,83 +32,6 @@ def get_best_try(
     return best_doe
 
 
-@dataclass
-class MatrixRowSwitchCache:
-    row_size: int
-    column_size: int
-    _max_switches_per_column: int = field(init=False, repr=False, default=None)
-    _cache: list[np.ndarray] = field(init=False, repr=False, default=None)
-    _cache_sizes: np.ndarray = field(init=False, repr=False, default=None)
-
-    def __post_init__(self) -> None:
-        # We switch two rows, thus the magic number
-        self._max_switches_per_column = combine(self.row_size, 2)
-        self.reset()
-
-    @property
-    def is_full(self) -> bool:
-        return np.min(self._cache_sizes) >= self._max_switches_per_column
-
-    def reset(self) -> None:
-        self._cache_sizes = np.zeros(self.column_size, dtype=int)
-        self._cache = [np.zeros((0, 2), dtype=int) for _ in range(self.column_size)]
-
-    def choose_column(self) -> int:
-        return np.random.choice(
-            np.where(self._cache_sizes < self._max_switches_per_column)[0]
-        )
-
-    def choose_rows(self, column: int) -> tuple[int, int]:
-        def choose_non_occupied(occupied: set[int]) -> int:
-            return np.random.choice(
-                [idx for idx in range(self.row_size) if idx not in occupied]
-            )
-
-        row_cache = self._cache[column]
-        max_switches_per_row = self.row_size - 1
-        fulls, counts = np.unique(row_cache, return_counts=True)
-        row_1 = choose_non_occupied(set(fulls[counts >= max_switches_per_row]))
-        row_2 = choose_non_occupied(
-            set(row_cache[np.any(row_cache == row_1, axis=1)].ravel())
-        )
-        return row_1, row_2
-
-    def cache(self, column: int, row_1: int, row_2: int) -> None:
-        if np.any(np.all(self._cache[column] == np.array([[row_1, row_2]]), axis=1)):
-            # TODO: REMOVE THIS
-            raise RuntimeError("Unexpected cache invalidation")
-        self._cache[column] = np.append(
-            self._cache[column], np.array([[row_1, row_2]]), axis=0
-        )
-        self._cache_sizes[column] += 1
-
-    def switch_rows_and_cache(self, matrix: np.ndarray) -> np.ndarray:
-        column = self.choose_column()
-        row_1, row_2 = self.choose_rows(column)
-        self.cache(column, row_1, row_2)
-        matrix[row_1, column], matrix[row_2, column] = (
-            matrix[row_2, column],
-            matrix[row_1, column],
-        )
-        return matrix
-
-
-"""
-should be Part of scoring but was in optimize
- if doe_old is None:
-        appender = appender_loc = lambda x: x
-    else:
-        locs = [doe_start.min(0, keepdims=True), doe_start.max(0, keepdims=True)]
-        locs = np.logical_and((doe_old >= locs[0]).all(1),
-                              (doe_old <= locs[1]).all(1))
-        appender_loc = lambda x: np.append(doe_old[locs].reshape((-1, x.shape[1])), x, axis=0)
-        appender = lambda x: np.append(doe_old, x, axis=0)  # will be used for calculating score
-
-    dist_max = np.max(appender(doe_start), axis=0) - np.min(appender(doe_start), axis=0)
-    dist_max = np.log(np.sqrt(np.sum(dist_max ** 2)))
-"""
-
-
 def simulated_annealing_by_perturbation(
     doe: np.ndarray,
     scorer: Scorer,
@@ -109,6 +41,22 @@ def simulated_annealing_by_perturbation(
     max_steps_without_improvement: int = 25,
     verbose: int = 2,
 ) -> np.ndarray:
+    """
+    Simulated annealing algorithm to maximize the score of a design of experiments (DoE) by
+    perturbing the rows of the design matrix along the columns. This kind of perturbation is
+    used to avoid violating the Latin hypercube scheme, i.e. to keep the number of filled bins
+    same.
+
+    :param doe: DoE matrix with shape (sample_size, len(variables)).
+    :param scorer: A scoring function for the doe. It will be maximized.
+    :param steps: Number of steps for the annealing algorithm.
+    :param cooling_rate: Annealing parameter to decay temperature.
+    :param temperature: Annealing temperature.
+    :param max_steps_without_improvement: A limit on the maximum steps to take for exploration before setting the
+        reference matrix to the last best value.
+    :param verbose: Controls print messages. 2 leads to maximum verbosity,
+    :return: Optimized DoE matrix
+    """
     if temperature <= 1e-16:
         raise ValueError("temperature must be strictly positive.")
     if not 0 <= cooling_rate <= 1:
@@ -125,8 +73,10 @@ def simulated_annealing_by_perturbation(
     start_score = anneal_step_score = best_score = scorer(doe)
 
     steps_without_improvement = 0
-    switch_cache = MatrixRowSwitchCache(row_size=doe.shape[0], column_size=doe.shape[1])
-    old_switch_cache = MatrixRowSwitchCache(
+    switch_cache = _MatrixRowSwitchCache(
+        row_size=doe.shape[0], column_size=doe.shape[1]
+    )
+    old_switch_cache = _MatrixRowSwitchCache(
         row_size=doe.shape[0], column_size=doe.shape[1]
     )
     for i_try in range(1, steps + 1):
@@ -176,3 +126,63 @@ def simulated_annealing_by_perturbation(
             f"Final score improved start score by {100 * (best_score - start_score) / abs(start_score):.1f} %"
         )
     return best_doe
+
+
+@dataclass
+class _MatrixRowSwitchCache:
+    """A cache that is used in simulated annealing to avoid repeating the same perturbations"""
+
+    row_size: int
+    column_size: int
+    _max_switches_per_column: int = field(init=False, repr=False, default=None)
+    _cache: list[np.ndarray] = field(init=False, repr=False, default=None)
+    _cache_sizes: np.ndarray = field(init=False, repr=False, default=None)
+
+    def __post_init__(self) -> None:
+        # We switch two rows, thus the magic number
+        self._max_switches_per_column = combine(self.row_size, 2)
+        self.reset()
+
+    @property
+    def is_full(self) -> bool:
+        return np.min(self._cache_sizes) >= self._max_switches_per_column
+
+    def reset(self) -> None:
+        self._cache_sizes = np.zeros(self.column_size, dtype=int)
+        self._cache = [np.zeros((0, 2), dtype=int) for _ in range(self.column_size)]
+
+    def choose_column(self) -> int:
+        return np.random.choice(
+            np.where(self._cache_sizes < self._max_switches_per_column)[0]
+        )
+
+    def choose_rows(self, column: int) -> tuple[int, int]:
+        def choose_non_occupied(occupied: set[int]) -> int:
+            return np.random.choice(
+                [idx for idx in range(self.row_size) if idx not in occupied]
+            )
+
+        row_cache = self._cache[column]
+        max_switches_per_row = self.row_size - 1
+        fulls, counts = np.unique(row_cache, return_counts=True)
+        row_1 = choose_non_occupied(set(fulls[counts >= max_switches_per_row]))
+        row_2 = choose_non_occupied(
+            set(row_cache[np.any(row_cache == row_1, axis=1)].ravel())
+        )
+        return row_1, row_2
+
+    def cache(self, column: int, row_1: int, row_2: int) -> None:
+        self._cache[column] = np.append(
+            self._cache[column], np.array([[row_1, row_2]]), axis=0
+        )
+        self._cache_sizes[column] += 1
+
+    def switch_rows_and_cache(self, matrix: np.ndarray) -> np.ndarray:
+        column = self.choose_column()
+        row_1, row_2 = self.choose_rows(column)
+        self.cache(column, row_1, row_2)
+        matrix[row_1, column], matrix[row_2, column] = (
+            matrix[row_2, column],
+            matrix[row_1, column],
+        )
+        return matrix

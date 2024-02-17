@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import uniform
 
 from experiment_design.experiment_designer import ExperimentDesigner
-from experiment_design.optimize import get_best_try
+from experiment_design.optimize import random_search
 from experiment_design.scorers import Scorer
 from experiment_design.variable import DesignSpace, VariableCollection
 
@@ -21,7 +21,9 @@ class RandomExperimentDesigner(ExperimentDesigner):
         final_steps: int,
     ) -> np.ndarray:
         steps = initial_steps + final_steps
-        return get_best_try(partial(sample_from, variables, sample_size), scorer, steps)
+        return random_search(
+            partial(sample_from, variables, sample_size), scorer, steps
+        )
 
     def _extend(
         self,
@@ -33,7 +35,9 @@ class RandomExperimentDesigner(ExperimentDesigner):
         final_steps: int,
     ) -> np.ndarray:
         steps = initial_steps + final_steps
-        return get_best_try(partial(sample_from, variables, sample_size), scorer, steps)
+        return random_search(
+            partial(sample_from, variables, sample_size), scorer, steps
+        )
 
 
 def sample_from(variables: VariableCollection, sample_size: int) -> np.ndarray:
