@@ -2,7 +2,6 @@ from functools import partial
 from typing import Callable, Optional, Union
 
 import numpy as np
-from numpy.linalg import LinAlgError
 from scipy.linalg import solve_triangular
 from scipy.stats import uniform
 
@@ -22,17 +21,36 @@ from experiment_design.variable import DesignSpace, VariableCollection
 
 
 class OrthogonalSamplingDesigner(ExperimentDesigner):
+    """
+    Create or extend an orthogonal sampling design. Orthogonal sampling design partitions the design space into
+    bins of equal marginal probability and places samples such that each bin is only filled once for each dimension.
+    If all variables are uniform, orthogonal sampling becomes a Latin hypercube sampling.
+
+    :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)), representing the linear
+        dependency between the dimensions. If a float, all non-diagonal entries of the unit matrix will be set to this
+        value.
+    :param central_design: If True, samples are placed exactly at the middle of each bin. Otherwise, they are placed
+        randomly between the 25% and 75% of the bin bounds.
+    :param non_occupied_bins: Only relevant for extending the design, i.e. if old points are provided, and if the constraint
+        regarding the number of occupation of each bin has to be violated. True means that each bin is occupied at least
+        once for each dimension, although some bins might be occupied more often. Otherwise, each bin is occupied once
+        or less often, leading to empty bins in some cases.
+    :param scorer_factory: A factory that creates scorers for the given variables, sample_size and in the cast of an
+        extension, old sampling points. If not passed, a default one will be created, that evaluates the maximum
+        correlation error and minimum pairwise distance. See `experiment_design.scorers.create_default_scorer_factory`
+        for more details.
+    """
 
     def __init__(
         self,
         target_correlation: Union[np.ndarray, float] = 0.0,
         central_design: bool = False,
-        dense_filling: bool = True,
+        non_occupied_bins: bool = False,
         scorer_factory: Optional[ScorerFactory] = None,
     ) -> None:
         self.target_correlation = target_correlation
         self.central_design = central_design
-        if dense_filling:
+        if non_occupied_bins:
             self.empty_size_check = np.max
         else:
             self.empty_size_check = np.min
@@ -119,6 +137,7 @@ def create_orthogonal_design(
     target_correlation: np.ndarray,
     central_design: bool = True,
 ) -> np.ndarray:
+    """Create an orthogonal design without any optimization."""
     if not isinstance(variables, DesignSpace):
         variables = DesignSpace(variables)
     # Sometimes, we may randomly generate probabilities with
@@ -130,7 +149,7 @@ def create_orthogonal_design(
         doe = variables.value_of(probabilities)
         try:
             return iman_connover_transformation(doe, target_correlation)
-        except np.linalg.LinAlgError as exc:
+        except np.linalg.LinAlgError:
             pass
     raise
 
@@ -138,6 +157,7 @@ def create_orthogonal_design(
 def create_lhd_probabilities(
     num_variables: int, sample_size: int, central_design: bool = True
 ) -> np.ndarray:
+    """Create probabilities for a Latin hypercube design."""
     doe = uniform.rvs(size=(sample_size, num_variables))
     doe = (np.argsort(doe, axis=0) + 0.5) / sample_size
     if central_design:
@@ -152,6 +172,7 @@ def iman_connover_transformation(
     means: Optional[np.ndarray] = None,
     standard_deviations: Optional[np.ndarray] = None,
 ) -> np.ndarray:
+    """Rearrange the values of doe to reduce correlation error while keeping the Latin hypercube constraint"""
     # See Chapter 4.3.2 of
     # Local Latin Hypercube Refinement for Uncertainty Quantification and Optimization, Can Bogoclu, (2022)
     if means is None:
@@ -173,6 +194,7 @@ def second_moment_transformation(
     means: Union[float, np.ndarray],
     target_covariance: np.ndarray,
 ) -> np.ndarray:
+    """Second-moment transformation for achieving the target covariance"""
     target_cov_upper = np.linalg.cholesky(
         target_covariance
     ).T  # convert to covariance before Cholesky
