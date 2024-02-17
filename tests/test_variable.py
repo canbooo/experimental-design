@@ -3,6 +3,7 @@ import pytest
 from scipy import stats
 
 import experiment_design.variable as module_under_test
+import experiment_design.variable.space
 
 
 @pytest.fixture
@@ -26,21 +27,23 @@ def standard_normal() -> module_under_test.ContinuousVariable:
     ),
     ids=("Continuous", "Mixed", "Discrete"),
 )
-def design_space(request) -> module_under_test.DesignSpace:
+def design_space(request) -> experiment_design.variable.space.DesignSpace:
     variables = module_under_test.create_variables_from_distributions(request.param)
-    return module_under_test.DesignSpace(variables)
+    return experiment_design.variable.space.DesignSpace(variables)
 
 
 def test_is_frozen_discrete():
-    assert module_under_test.is_frozen_discrete(stats.uniform()) is False
-    assert module_under_test.is_frozen_discrete(stats.bernoulli) is False
-    assert module_under_test.is_frozen_discrete(stats.bernoulli(0.5)) is True
+    assert module_under_test.variable._is_frozen_discrete(stats.uniform()) is False
+    assert module_under_test.variable._is_frozen_discrete(stats.bernoulli) is False
+    assert module_under_test.variable._is_frozen_discrete(stats.bernoulli(0.5)) is True
 
 
 def test_is_frozen_continuous():
-    assert module_under_test.is_frozen_continuous(stats.bernoulli(0.5)) is False
-    assert module_under_test.is_frozen_continuous(stats.uniform) is False
-    assert module_under_test.is_frozen_continuous(stats.uniform()) is True
+    assert (
+        module_under_test.variable._is_frozen_continuous(stats.bernoulli(0.5)) is False
+    )
+    assert module_under_test.variable._is_frozen_continuous(stats.uniform) is False
+    assert module_under_test.variable._is_frozen_continuous(stats.uniform()) is True
 
 
 def test_create_continuous_discrete_uniform_variables():
@@ -113,43 +116,33 @@ class TestContinuousVariable:
         self, standard_normal: module_under_test.ContinuousVariable
     ):
         standard_normal.lower_bound = -5
-        assert standard_normal.get_finite_lower_bound() == -5
+        assert standard_normal.finite_lower_bound == -5
 
     def test_finite_lower_bound_finite(self):
         var = module_under_test.ContinuousVariable(distribution=stats.uniform(0, 1))
-        assert var.get_finite_lower_bound() == 0
+        assert var.finite_lower_bound == 0
 
     def test_finite_lower_bound_infinite(
         self, standard_normal: module_under_test.ContinuousVariable
     ):
-        tol = 2.5e-2
-        assert np.isclose(
-            standard_normal.get_finite_lower_bound(
-                infinite_support_probability_tolerance=tol
-            ),
-            -1.95996,
-        )
+        standard_normal.infinite_bound_probability_tolerance = 2.5e-2
+        assert np.isclose(standard_normal.finite_lower_bound, -1.95996)
 
     def test_finite_upper_bound_given(
         self, standard_normal: module_under_test.ContinuousVariable
     ):
         standard_normal.upper_bound = 5
-        assert standard_normal.get_finite_upper_bound() == 5
+        assert standard_normal.finite_upper_bound == 5
 
     def test_finite_upper_bound_finite(self):
         var = module_under_test.ContinuousVariable(distribution=stats.uniform(0, 1))
-        assert var.get_finite_upper_bound() == 1
+        assert var.finite_upper_bound == 1
 
     def test_finite_upper_bound_infinite(
         self, standard_normal: module_under_test.ContinuousVariable
     ):
-        tol = 2.5e-2
-        assert np.isclose(
-            standard_normal.get_finite_upper_bound(
-                infinite_support_probability_tolerance=tol
-            ),
-            1.95996,
-        )
+        standard_normal.infinite_bound_probability_tolerance = 2.5e-2
+        assert np.isclose(standard_normal.finite_upper_bound, 1.95996)
 
 
 class TestDiscreteVariable:
@@ -175,17 +168,17 @@ class TestDiscreteVariable:
     def test_get_finite_lower_bound(
         self, discrete_bernoulli: module_under_test.DiscreteVariable
     ):
-        assert discrete_bernoulli.get_finite_lower_bound() == 42
+        assert discrete_bernoulli.finite_lower_bound == 42
 
     def test_get_finite_upper_bound(
         self, discrete_bernoulli: module_under_test.DiscreteVariable
     ):
-        assert discrete_bernoulli.get_finite_upper_bound() == 666
+        assert discrete_bernoulli.finite_upper_bound == 666
 
 
 class TestDesignSpace:
 
-    def test_value_of(self, design_space: module_under_test.DesignSpace):
+    def test_value_of(self, design_space: experiment_design.variable.space.DesignSpace):
         probabilities = np.array([[0.1, 0.1], [0.5, 0.6], [0.9, 0.8]])
         if isinstance(design_space.variables[0], module_under_test.DiscreteVariable):
             # Both are discrete
@@ -199,13 +192,13 @@ class TestDesignSpace:
         assert np.all(np.isclose(design_space.value_of(probabilities), expected))
 
     def test_design_space_size_getters(
-        self, design_space: module_under_test.DesignSpace
+        self, design_space: experiment_design.variable.space.DesignSpace
     ):
         assert design_space.dimensions == 2
         assert len(design_space) == 2
 
     def test_design_space_lower_bound(
-        self, design_space: module_under_test.DesignSpace
+        self, design_space: experiment_design.variable.space.DesignSpace
     ):
         if isinstance(design_space.variables[0], module_under_test.DiscreteVariable):
             # Both are discrete
@@ -219,7 +212,7 @@ class TestDesignSpace:
         assert all(design_space.lower_bound == expected)
 
     def test_design_space_upper_bound(
-        self, design_space: module_under_test.DesignSpace
+        self, design_space: experiment_design.variable.space.DesignSpace
     ):
         if isinstance(design_space.variables[0], module_under_test.DiscreteVariable):
             # Both are discrete
@@ -230,4 +223,4 @@ class TestDesignSpace:
         else:
             # Both are continuous
             expected = np.array([2, 2])
-        assert all(design_space.upper_bound == expected)
+        assert np.all(design_space.upper_bound == expected)
