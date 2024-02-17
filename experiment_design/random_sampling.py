@@ -9,7 +9,7 @@ from experiment_design.scorers import Scorer
 from experiment_design.variable import DesignSpace, VariableCollection
 
 
-class RandomExperimentDesigner(ExperimentDesigner):
+class RandomSamplingDesigner(ExperimentDesigner):
     """Create or extend a design of experiments (DoE) by randomly sampling from the variable distributions."""
 
     def _create(
