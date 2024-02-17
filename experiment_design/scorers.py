@@ -256,11 +256,14 @@ def create_old_doe_handler(
         # Append every point in the old doe
         return lambda x: np.append(old_sample, x, axis=0)
 
+    old_sample = select_local(old_sample, variables)
+    return lambda x: np.append(old_sample, x, axis=0)
+
+
+def select_local(samples: np.ndarray, variables: VariableCollection) -> np.ndarray:
+    """Select and return samples that fall within the finite bounds of the variables"""
     if not isinstance(variables, DesignSpace):
         variables = DesignSpace(variables)
     lower, upper = variables.lower_bound[None, :], variables.upper_bound[None, :]
-    local_mask = np.logical_and(
-        (old_sample >= lower).all(1), (old_sample <= upper).all(1)
-    )
-    old_sample = old_sample[local_mask]
-    return lambda x: np.append(old_sample, x, axis=0)
+    local_mask = np.logical_and((samples >= lower).all(1), (samples <= upper).all(1))
+    return samples[local_mask]
