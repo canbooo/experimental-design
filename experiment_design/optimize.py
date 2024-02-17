@@ -10,7 +10,7 @@ from experiment_design.scorers import Scorer
 
 
 def random_search(
-    creator: Callable[[], np.ndarray], scorer: Scorer, steps: int
+    creator: Callable[[], np.ndarray], scorer: Scorer, steps: int, verbose: int = 0
 ) -> np.ndarray:
     """
     Given a design of experiment (DoE) creator and scorer, maximize the score
@@ -19,16 +19,28 @@ def random_search(
     :param creator: A function that creates DoEs.
     :param scorer: A function that scores DoEs.
     :param steps: Number of steps to search.
+    :param verbose: Controls print messages. 2 leads to maximum verbosity,
     :return: The DoE matrix with the best score.
     """
     steps = max(1, steps)
-    best_score, best_doe = -np.inf, None
-    for _ in range(steps):
+    best_doe = creator()
+    start_score = best_score = scorer(best_doe)
+    if verbose > 1:
+        print(f"Initial score: {start_score:.2e}")
+    for i_try in range(2, steps + 1):
         doe = creator()
         score = scorer(doe)
         if score > best_score:
             best_doe = doe
             best_score = score
+            if verbose > 1:
+                print(
+                    f"Step {i_try} - start score improved by {100 * abs((best_score - start_score) / start_score):.1f}%"
+                )
+    if verbose:
+        print(
+            f"Final score improved start score by {100 * abs((best_score - start_score) / start_score):.1f}% in {steps} steps"
+        )
     return best_doe
 
 
@@ -39,7 +51,7 @@ def simulated_annealing_by_perturbation(
     cooling_rate: float = 0.95,
     temperature: float = 25.0,
     max_steps_without_improvement: int = 25,
-    verbose: int = 2,
+    verbose: int = 0,
 ) -> np.ndarray:
     """
     Simulated annealing algorithm to maximize the score of a design of experiments (DoE) by
@@ -71,7 +83,8 @@ def simulated_annealing_by_perturbation(
     doe_start = doe.copy()
     best_doe = doe.copy()
     start_score = anneal_step_score = best_score = scorer(doe)
-
+    if verbose > 1:
+        print(f"Initial score: {start_score:.2e}")
     steps_without_improvement = 0
     switch_cache = _MatrixRowSwitchCache(
         row_size=doe.shape[0], column_size=doe.shape[1]
@@ -79,7 +92,7 @@ def simulated_annealing_by_perturbation(
     old_switch_cache = _MatrixRowSwitchCache(
         row_size=doe.shape[0], column_size=doe.shape[1]
     )
-    for i_try in range(1, steps + 1):
+    for i_try in range(2, steps + 1):
         doe_try = switch_cache.switch_rows_and_cache(doe_start.copy())
         curr_score = scorer(doe_try)
         with warnings.catch_warnings():
@@ -103,7 +116,7 @@ def simulated_annealing_by_perturbation(
                 steps_without_improvement = 0
                 if verbose > 1:
                     print(
-                        f"{i_try} - start score improved by {100 * (best_score - start_score) / abs(start_score):.1f} %"
+                        f"{i_try} - start score improved by {100 * abs((best_score - start_score) / start_score):.1f}%"
                     )
         steps_without_improvement += 1
 
@@ -117,13 +130,13 @@ def simulated_annealing_by_perturbation(
             steps_without_improvement = 0
 
         if switch_cache.is_full:
-            if verbose > 0:
+            if verbose > 1:
                 print("No more perturbation left to improve the score")
             break
 
-    if verbose > 0:
+    if verbose:
         print(
-            f"Final score improved start score by {100 * (best_score - start_score) / abs(start_score):.1f} %"
+            f"Final score improved start score by {100 * abs((best_score - start_score) / start_score):.1f}% in {steps} steps"
         )
     return best_doe
 
