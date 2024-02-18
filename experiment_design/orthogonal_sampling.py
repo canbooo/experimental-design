@@ -29,8 +29,10 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
     :param target_correlation: A symmetric matrix with shape (len(variables), len(variables)), representing the linear
         dependency between the dimensions. If a float, all non-diagonal entries of the unit matrix will be set to this
         value.
-    :param central_design: If True, samples are placed exactly at the middle of each bin. Otherwise, they are placed
-        randomly between the bin bounds.
+    :param inter_bin_randomness: Controls the randomness of placed points between the bin bounds. Specifically, 0. means that
+        the points are placed at the center of each bin, whereas 1. leads to a random point placement within the bounds.
+        Any other fractions leads to a random placement within that fraction of the bin bounds in each dimension.
+
     :param non_occupied_bins: Only relevant for extending the design, i.e. if old points are provided, and if the constraint
         regarding the number of occupation of each bin has to be violated. True means that each bin is occupied at least
         once for each dimension, although some bins might be occupied more often. Otherwise, each bin is occupied once
@@ -44,12 +46,12 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
     def __init__(
         self,
         target_correlation: Union[np.ndarray, float] = 0.0,
-        central_design: bool = False,
+        inter_bin_randomness: float = 1.0,
         non_occupied_bins: bool = False,
         scorer_factory: Optional[ScorerFactory] = None,
     ) -> None:
         self.target_correlation = target_correlation
-        self.central_design = central_design
+        self.inter_bin_randomness = inter_bin_randomness
         if non_occupied_bins:
             self.empty_size_check = np.max
         else:
@@ -78,7 +80,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
                 variables=variables,
                 sample_size=sample_size,
                 target_correlation=target_correlation,
-                central_design=self.central_design,
+                inter_bin_randomness=self.inter_bin_randomness,
             )
 
         if verbose:
@@ -89,7 +91,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
                 variables=variables,
                 sample_size=sample_size,
                 target_correlation=target_correlation,
-                central_design=self.central_design,
+                inter_bin_randomness=self.inter_bin_randomness,
             ),
             scorer=scorer,
             steps=initial_steps,
@@ -130,7 +132,7 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
                 empty_bins=empty,
                 variables=variables,
                 sample_size=sample_size,
-                central_design=self.central_design,
+                inter_bin_randomness=self.inter_bin_randomness,
             ),
             scorer=scorer,
             steps=initial_steps,
@@ -147,7 +149,7 @@ def create_orthogonal_design(
     variables: VariableCollection,
     sample_size: int,
     target_correlation: np.ndarray,
-    central_design: bool = True,
+    inter_bin_randomness: float = 1.0,
 ) -> np.ndarray:
     """Create an orthogonal design without any optimization."""
     if not isinstance(variables, DesignSpace):
@@ -156,25 +158,32 @@ def create_orthogonal_design(
     # singular correlation matrices. Try 3 times to avoid issue until we give up
     for k in range(3):
         probabilities = create_lhd_probabilities(
-            len(variables), sample_size, central_design=central_design
+            len(variables), sample_size, inter_bin_randomness=inter_bin_randomness
         )
         doe = variables.value_of(probabilities)
         try:
             return iman_connover_transformation(doe, target_correlation)
         except np.linalg.LinAlgError:
             pass
-    raise
+
+    return doe
 
 
 def create_lhd_probabilities(
-    num_variables: int, sample_size: int, central_design: bool = True
+    num_variables: int,
+    sample_size: int,
+    inter_bin_randomness: float = 1.0,
 ) -> np.ndarray:
     """Create probabilities for a Latin hypercube design."""
+    if not 0.0 <= inter_bin_randomness <= 1.0:
+        raise ValueError(
+            f"inter_bin_randomness has to be between 0 and 1, got {inter_bin_randomness}"
+        )
     doe = uniform.rvs(size=(sample_size, num_variables))
     doe = (np.argsort(doe, axis=0) + 0.5) / sample_size
-    if central_design:
+    if inter_bin_randomness == 0.0:
         return doe
-    delta = 1 / sample_size
+    delta = inter_bin_randomness / sample_size
     return doe + uniform(-delta / 2, delta).rvs(size=(sample_size, num_variables))
 
 
@@ -255,8 +264,12 @@ def _create_candidates_from(
     empty_bins: np.ndarray,
     variables: DesignSpace,
     sample_size: int,
-    central_design: bool = False,
+    inter_bin_randomness: float = 1.0,
 ) -> np.ndarray:
+    if not 0.0 <= inter_bin_randomness <= 1.0:
+        raise ValueError(
+            f"inter_bin_randomness has to be between 0 and 1, got {inter_bin_randomness}"
+        )
     empty_rows, empty_cols = np.where(empty_bins)
     bins_per_dimension, dimensions = empty_bins.shape
     delta = 1 / bins_per_dimension
@@ -272,6 +285,7 @@ def _create_candidates_from(
             extra = np.random.choice(available, diff, replace=False)
             values = np.append(extra, values)
         probabilities[:, i_dim] = values * delta + delta / 2
-    if not central_design:
+    if inter_bin_randomness > 0.0:
+        delta *= inter_bin_randomness
         probabilities += uniform(-delta / 2, delta).rvs(size=(sample_size, dimensions))
     return variables.value_of(probabilities)
