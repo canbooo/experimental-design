@@ -73,7 +73,8 @@ class MaxCorrelationScorerFactory:
         :param old_sample: If passed, represents the matrix of points in an older design of experiments with shape
             (old_sample_size, len(variables)). Depending on self.local, some or all of these will be appended to the
             candidate points before computing the correlation error.
-        :return: a scorer that returns the negative log maximum absolute correlation error.
+        :return: a scorer that returns the negative exp(maximum absolute correlation error + 1). If the error is
+            smaller than self.eps, it returns negative exp(maximum absolute correlation error - 1) instead.
         """
 
         target_correlation = create_correlation_matrix(
@@ -85,7 +86,9 @@ class MaxCorrelationScorerFactory:
             error = np.max(
                 np.abs(np.corrcoef(handler(doe), rowvar=False) - target_correlation)
             )
-            return -np.log10(error + self.eps)
+            if error > self.eps:
+                return -np.exp(error + 1)
+            return -np.exp(error - 1)
 
         return _scorer
 
@@ -126,11 +129,13 @@ class PairwiseDistanceScorerFactory:
         """
 
         handler = create_old_doe_handler(variables, old_sample, local=self.local)
-        max_log_distance = np.log10(calculate_max_space_distance(variables))
+        bin_diagonal_length = calculate_equidistant_bin_diagonal_length(
+            variables, sample_size
+        )
 
         def _scorer(doe: np.ndarray) -> float:
-            min_pairwise_distance = np.log10(np.min(pdist(handler(doe))))
-            return min_pairwise_distance - max_log_distance
+            min_pairwise_distance = np.min(pdist(handler(doe)))
+            return np.exp(min_pairwise_distance / bin_diagonal_length)
 
         return _scorer
 
@@ -177,8 +182,8 @@ class WeightedSumScorerFactory:
 
 def create_default_scorer_factory(
     target_correlation: Union[np.ndarray, float] = 0.0,
-    distance_score_weight: float = 0.85,
-    correlation_score_weight: float = 0.15,
+    distance_score_weight: float = 0.9,
+    correlation_score_weight: float = 0.1,
     local_correlation: bool = True,
     local_pairwise_distance: bool = False,
 ) -> ScorerFactory:
@@ -205,12 +210,14 @@ def create_default_scorer_factory(
     )
 
 
-def calculate_max_space_distance(variables: VariableCollection) -> float:
-    """Calculate the length of the diagonal of the (Euclidean) design space"""
+def calculate_equidistant_bin_diagonal_length(
+    variables: VariableCollection, sample_size: int
+) -> float:
+    """Calculate the length of the diagonal of equidistant bins the (Euclidean) design space"""
     if not isinstance(variables, DesignSpace):
         variables = DesignSpace(variables)
     lower, upper = variables.lower_bound, variables.upper_bound
-    return np.linalg.norm(np.array(upper) - np.array(lower))
+    return np.linalg.norm((np.array(upper) - np.array(lower)) / sample_size)
 
 
 def create_correlation_matrix(
