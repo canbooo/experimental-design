@@ -53,9 +53,9 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
         self.target_correlation = target_correlation
         self.inter_bin_randomness = inter_bin_randomness
         if non_occupied_bins:
-            self.empty_size_check = np.max
-        else:
             self.empty_size_check = np.min
+        else:
+            self.empty_size_check = np.max
         if scorer_factory is None:
             scorer_factory = create_default_scorer_factory(
                 target_correlation=target_correlation
@@ -113,16 +113,20 @@ class OrthogonalSamplingDesigner(ExperimentDesigner):
         final_steps: int,
         verbose: int,
     ) -> np.ndarray:
-        probabilities = variables.cdf_of(select_local(old_sample, variables))
+        local_doe = select_local(old_sample, variables)
+        probabilities = variables.cdf_of(local_doe)
         if not np.all(np.isfinite(probabilities)):
             raise RuntimeError(
                 "Non-finite probability encountered. Please check the distributions."
             )
 
-        bins_per_dimension = sample_size + old_sample.shape[0]
+        bins_per_dimension = sample_size + local_doe.shape[0]
 
         empty = _find_sufficient_empty_bins(
-            probabilities, bins_per_dimension, sample_size
+            probabilities,
+            bins_per_dimension,
+            sample_size,
+            empty_size_check=self.empty_size_check,
         )
         if verbose:
             print("Creating candidate points to extend the design")
