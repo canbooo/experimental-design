@@ -93,6 +93,10 @@ def simulated_annealing_by_perturbation(
         row_size=doe.shape[0], column_size=doe.shape[1]
     )
     for i_try in range(2, steps + 1):
+        if switch_cache.is_full:
+            if verbose > 1:
+                print("No more perturbation left to improve the score")
+            break
         doe_try = switch_cache.switch_rows_and_cache(doe_start.copy())
         curr_score = scorer(doe_try)
         with warnings.catch_warnings():
@@ -102,7 +106,7 @@ def simulated_annealing_by_perturbation(
             )
 
         if (
-            curr_score >= anneal_step_score
+            curr_score > anneal_step_score
             or np.random.random() <= transition_probability
         ):
             doe_start = doe_try.copy()
@@ -128,11 +132,6 @@ def simulated_annealing_by_perturbation(
             switch_cache = deepcopy(old_switch_cache)
             anneal_step_score = best_score
             steps_without_improvement = 0
-
-        if switch_cache.is_full:
-            if verbose > 1:
-                print("No more perturbation left to improve the score")
-            break
 
     if verbose:
         print(
@@ -165,9 +164,13 @@ class _MatrixRowSwitchCache:
         self._cache = [np.zeros((0, 2), dtype=int) for _ in range(self.column_size)]
 
     def choose_column(self) -> int:
-        return np.random.choice(
-            np.where(self._cache_sizes < self._max_switches_per_column)[0]
-        )
+        try:
+            return np.random.choice(
+                np.where(self._cache_sizes < self._max_switches_per_column)[0]
+            )
+        except:
+            print(np.where(self._cache_sizes < self._max_switches_per_column)[0])
+            pass
 
     def choose_rows(self, column: int) -> tuple[int, int]:
         def choose_non_occupied(occupied: set[int]) -> int:
