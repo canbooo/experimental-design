@@ -5,10 +5,6 @@ on:
       version:
         description: 'Version upload to pypi'
         required: true
-      pypi_repo:
-        description: 'Repo to upload to (testpypi or pypi)'
-        default: 'testpypi'
-        required: true
 
 jobs:
   release:
@@ -34,13 +30,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: publish_pypi
+    needs: release
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
-      id-token: write
+      contents: write
     steps:
-      - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v2.0
+      - name: Publish PyPi package
+        uses: code-specialist/pypi-poetry-publish@v1
         with:
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
-          plugins: "poetry-dynamic-versioning[plugin]"
-          poetry_install_options: "--without dev"
+          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PYPI_TOKEN }}
