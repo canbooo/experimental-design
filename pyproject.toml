@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "experimental-design"
-version = "0.1.0"
+version = "0.0.0"
 description = ""
 authors = ["Can Bogoclu"]
 readme = "README.md"
