@@ -1,4 +1,4 @@
-[![tests](https://github.com/canbooo/experiment-design/actions/workflows/test.yml/badge.svg)](https://github.com/canbooo/experiment-design/actions/workflows/test.yml)
+[![tests](https://github.com/canbooo/experimental-design/actions/workflows/tests.yml/badge.svg)](https://github.com/canbooo/experimental-design/actions/workflows/tests.yml)
 
 # `experimental-design`: Tools to create and extend experiment plans
 
