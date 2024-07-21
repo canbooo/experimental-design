@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Python package
+name: Lint and test
 
 on:
   push:
@@ -10,8 +10,13 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  lint:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - uses: psf/black@stable
 
+  test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
