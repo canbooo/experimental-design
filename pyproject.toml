@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "experimental-design"
 version = "0.0.0"
-description = ""
+description = "Tools to create designs of experiments"
 authors = ["Can Bogoclu"]
+license = "MIT"
 readme = "README.md"
 packages = [{include = "experiment_design"}]
 
