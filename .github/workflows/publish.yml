@@ -5,6 +5,10 @@ on:
       version:
         description: 'Version upload to pypi'
         required: true
+      pypi_repo:
+        description: 'Repo to upload to (testpypi or pypi)'
+        default: 'testpypi'
+        required: true
 
 jobs:
   release:
@@ -35,10 +39,27 @@ jobs:
       # IMPORTANT: this permission is mandatory for trusted publishing
       contents: write
     steps:
-      - name: Publish PyPi package
-        uses: cadifyai/poetry-publish@v0.1.0
-        with:
-          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-          PACKAGE_DIRECTORY: "./experiment_design/"
-          PUBLISH_REGISTRY: "https://test.pypi.org/simple/"
+      - name: Install poetry
+        run: |
+          pip install poetry
+        shell: bash
+      - name: Set GitHub Tag as Package Version
+        run: |
+          sed -i -r 's/__version__ = ".*"/__version__ = "${{ github.event.release.tag_name }}"/g' ./experiment_design/__init__.py
+          sed -i '0,/^version =.*/s//version = "'"${{ github.event.release.tag_name }}"'"/' ./pyproject.toml
+        shell: bash
+      - name: Install dependencies
+        run: |
+          poetry install --no-root
+      - name: Build and Publish
+        if: ${{ github.event.inputs.pypi_repo == 'pypi' }}
+        run: |
+          poetry config repositories.publish https://pypi.org/simple/
+          poetry publish -p ${{ secrets.PYPI_TOKEN }} -u __token__ -r publish --build
+        shell: bash
+      - name: Build and Publish
+        if: ${{ github.event.inputs.pypi_repo == 'testpypi' }}
+        run: |
+          poetry config repositories.publish https://test.pypi.org/simple/
+          poetry publish -p ${{ secrets.PYPI_TOKEN }} -u __token__ -r publish --build
+        shell: bash
