@@ -14,7 +14,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
       contents: write
       actions: write
     steps:
@@ -36,7 +35,6 @@ jobs:
     environment: publish_pypi
     needs: release
     permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
       contents: write
     steps:
       - name: Checkout Repository
