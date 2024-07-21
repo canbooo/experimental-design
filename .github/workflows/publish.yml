@@ -51,8 +51,7 @@ jobs:
       - name: Build and Publish
         if: ${{ github.event.inputs.pypi_repo == 'pypi' }}
         run: |
-          poetry config repositories.publish https://pypi.org/legacy/
-          poetry publish -p ${{ secrets.PYPI_TOKEN }} -u __token__ -r publish --build
+          poetry publish -p ${{ secrets.PYPI_TOKEN }} -u __token__ --build
         shell: bash
       - name: Build and Publish
         if: ${{ github.event.inputs.pypi_repo == 'testpypi' }}
