@@ -11,12 +11,13 @@ on:
         required: true
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
-    environment: publish_pypi
+    environment:
+      name: publish_pypi
+      url: https://pypi.org/p/experiment-design
     permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
-      id-token: write
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
       contents: write
       actions: write
     steps:
@@ -33,9 +34,28 @@ jobs:
           tag: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           body: ${{ steps.tag_version.outputs.changelog }}
-      - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v2.0
-        with:
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
-          plugins: "poetry-dynamic-versioning[plugin]"
-          poetry_install_options: "--without dev"
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Install poetry
+        run: |
+          pip install poetry
+        shell: bash
+      - name: Set GitHub Tag as Package Version
+        run: |
+          sed -i -r 's/__version__ = ".*"/__version__ = "${{ steps.tag_version.outputs.new_tag }}"/g' ./experiment_design/__init__.py
+          sed -i '0,/^version =.*/s//version = "'"${{ steps.tag_version.outputs.new_tag }}"'"/' ./pyproject.toml
+        shell: bash
+      - name: Install dependencies
+        run: |
+          poetry install --no-root
+      - name: Build and Publish
+        if: ${{ github.event.inputs.pypi_repo == 'pypi' }}
+        run: |
+          poetry publish -p ${{ secrets.PYPI_TOKEN }} -u __token__ --build
+        shell: bash
+      - name: Build and Publish
+        if: ${{ github.event.inputs.pypi_repo == 'testpypi' }}
+        run: |
+          poetry config repositories.publish https://test.pypi.org/legacy/
+          poetry publish -p ${{ secrets.TESTPYPI_TOKEN }} -u __token__ -r publish --build
+        shell: bash

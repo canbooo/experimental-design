@@ -1,10 +1,10 @@
 [![tests](https://github.com/canbooo/experimental-design/actions/workflows/tests.yml/badge.svg)](https://github.com/canbooo/experimental-design/actions/workflows/tests.yml)
 
-# `experimental-design`: Tools to create and extend experiment plans
+# `experiment-design`: Tools to create and extend experiment plans
 
 Documentation is under construction. You can install using
 
-`pip install experimental-design`
+`pip install experiment-design`
 
 See  [demos](./demos) for example usage.
 
