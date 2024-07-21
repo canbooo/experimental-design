@@ -13,6 +13,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: publish_pypi
     permissions:
       contents: write
       actions: write
@@ -30,11 +31,6 @@ jobs:
           tag: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           body: ${{ steps.tag_version.outputs.changelog }}
-  publish:
-    runs-on: ubuntu-latest
-    environment: publish_pypi
-    needs: release
-    steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
       - name: Install poetry
@@ -43,8 +39,8 @@ jobs:
         shell: bash
       - name: Set GitHub Tag as Package Version
         run: |
-          sed -i -r 's/__version__ = ".*"/__version__ = "${{ github.event.release.tag_name }}"/g' ./experiment_design/__init__.py
-          sed -i '0,/^version =.*/s//version = "'"${{ github.event.release.tag_name }}"'"/' ./pyproject.toml
+          sed -i -r 's/__version__ = ".*"/__version__ = "${{ steps.tag_version.outputs.new_tag }}"/g' ./experiment_design/__init__.py
+          sed -i '0,/^version =.*/s//version = "'"${{ steps.tag_version.outputs.new_tag }}"'"/' ./pyproject.toml
         shell: bash
       - name: Install dependencies
         run: |
