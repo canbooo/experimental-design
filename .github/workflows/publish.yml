@@ -1,0 +1,42 @@
+name: Publish to Pypi
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version upload to pypi'
+        required: true
+      pypi_repo:
+        description: 'Repo to upload to (testpypi or pypi)'
+        default: 'testpypi'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ github.event.inputs.version }}
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+  publish:
+    runs-on: ubuntu-latest
+    environment: publish_pypi
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
+    steps:
+      - name: Build and publish to pypi
+        uses: JRubics/poetry-publish@v2.0
+        with:
+          pypi_token: ${{ secrets.PYPI_TOKEN }}
+          plugins: "poetry-dynamic-versioning[plugin]"
+          poetry_install_options: "--without dev"
