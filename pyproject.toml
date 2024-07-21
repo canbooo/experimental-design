@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "experimental-design"
+name = "experiment-design"
 version = "0.0.0"
 description = "Tools to create designs of experiments"
 authors = ["Can Bogoclu"]
