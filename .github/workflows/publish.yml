@@ -40,5 +40,5 @@ jobs:
         with:
           ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-          PACKAGE_DIRECTORY: "./experiment_design"
+          PACKAGE_DIRECTORY: "./experiment_design/"
           PUBLISH_REGISTRY: "https://test.pypi.org/simple/"
