@@ -1,8 +1,12 @@
 [![tests](https://github.com/canbooo/experiment-design/actions/workflows/test.yml/badge.svg)](https://github.com/canbooo/experiment-design/actions/workflows/test.yml)
 
-# `expriment-design` tools to create and extend experiment plans
+# `experimental-design`: Tools to create and extend experiment plans
 
-Under construction. See  [demos](./demos) for example usage.
+Documentation is under construction. You can install using
+
+`pip install experimental-design`
+
+See  [demos](./demos) for example usage.
 
 ## Create and extend Latin hypercube designs
 
