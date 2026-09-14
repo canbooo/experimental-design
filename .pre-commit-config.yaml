@@ -8,13 +8,13 @@ repos:
       - id: check-added-large-files
       - id: mixed-line-ending
   - repo: https://github.com/PyCQA/isort
-    rev: 9.0.0a3
+    rev: 9.0.1
     hooks:
       - id: isort
         args: [ "--profile", "black", "--skip", "experiment_design/variable/__init__.py", "--filter-files"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.15.15
+    rev: v0.16.7
     hooks:
       # Run the linter.
       - id: ruff
